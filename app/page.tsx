@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { KoinosLogo } from "@/components/koinos-logo";
+import { WalletConnect } from "@/components/wallet-connect";
+import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project } from "@/lib/utils";
 
 // Interface for processed project data
@@ -20,74 +22,70 @@ export default function Home() {
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      setLoading(true);
-      const fund = getFundContract();
-      try {
-        const { result } = await fund.functions.get_projects<{ projects: Project[] }>({
-          status: ProjectStatus.Active, // can be Upcoming, Active, or Past
-          order_by: OrderBy.Votes, // can be Order by creation Date or number of Votes
-          limit: pageSize,
-          start: pageStart,
-          descending: true,
-        });
-        
-        // Process the data
-        const processedProjects = (result?.projects || []).map(project => ({
-          ...project,
-          monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-          start_date: new Date(parseInt(project.start_date)),
-          end_date: new Date(parseInt(project.end_date)),
-          total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
-        }));
-        
-        setActiveProjects(processedProjects);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-        setLoading(false);
-      }
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    const fund = getFundContract();
+    
+    try {
+      // Fetch active projects
+      const activeResult = await fund.functions.get_projects<{ projects: Project[] }>({
+        status: ProjectStatus.Active,
+        order_by: OrderBy.Votes,
+        limit: pageSize,
+        start: pageStart,
+        descending: true,
+      });
+      
+      const processedActiveProjects = (activeResult?.result?.projects || []).map(project => ({
+        ...project,
+        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
+        start_date: new Date(parseInt(project.start_date)),
+        end_date: new Date(parseInt(project.end_date)),
+        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+      }));
+      
+      setActiveProjects(processedActiveProjects);
 
-      try {
-        const { result } = await fund.functions.get_projects<{ projects: Project[] }>({
-          status: ProjectStatus.Upcoming, // can be Upcoming, Active, or Past
-          order_by: OrderBy.Votes, // can be Order by creation Date or number of Votes
-          limit: pageSize,
-          start: pageStart,
-          descending: true,
-        });
-        
-        // Process the data
-        const processedProjects = (result?.projects || []).map(project => ({
-          ...project,
-          monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-          start_date: new Date(parseInt(project.start_date)),
-          end_date: new Date(parseInt(project.end_date)),
-          total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
-        }));
-        
-        setUpcomingProjects(processedProjects);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-        setLoading(false);
-      }
-    };
-  
-    fetchProjects();
+      // Fetch upcoming projects
+      const upcomingResult = await fund.functions.get_projects<{ projects: Project[] }>({
+        status: ProjectStatus.Upcoming,
+        order_by: OrderBy.Votes,
+        limit: pageSize,
+        start: pageStart,
+        descending: true,
+      });
+      
+      const processedUpcomingProjects = (upcomingResult?.result?.projects || []).map(project => ({
+        ...project,
+        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
+        start_date: new Date(parseInt(project.start_date)),
+        end_date: new Date(parseInt(project.end_date)),
+        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+      }));
+      
+      setUpcomingProjects(processedUpcomingProjects);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [pageSize, pageStart]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   return (
     <div className="min-h-screen relative">
       {/* Logo in top-left corner */}
       <div className="absolute top-4 left-4 flex items-center gap-2 z-10">
         <KoinosLogo width={40} height={39} />
-        <span className="text-2xl font-medium">KPS</span>
+        <span className="text-2xl font-medium">KFS</span>
       </div>
       
-      {/* Theme toggle in top-right corner */}
-      <div className="absolute top-4 right-4 z-10">
+      {/* Wallet and Theme toggle in top-right corner */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-4">
+        <WalletConnect />
         <ThemeToggle />
       </div>
       
@@ -164,6 +162,14 @@ export default function Home() {
                         {project.end_date.toLocaleDateString()}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Vote Button */}
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <VoteButton 
+                      projectId={project.id} 
+                      onVoteSuccess={fetchProjects}
+                    />
                   </div>
                 </div>
               ))}

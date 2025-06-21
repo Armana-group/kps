@@ -32,7 +32,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getFundContract(
-  // TODO: create useWallet component to get the provider
   provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
   address: string = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB"
 ): Contract {
