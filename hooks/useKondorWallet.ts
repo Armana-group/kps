@@ -115,12 +115,8 @@ export function useKondorWallet() {
       throw new Error('Kondor wallet not connected');
     }
 
-    try {
-      return kondor.getProvider('harbinger');
-    } catch (error) {
-      console.warn('Failed to get Kondor provider, using fallback:', error);
-      return new Provider(['https://rpc.koinos-testnet.com']);
-    }
+    // Use the working testnet RPC directly since harbinger-api.koinos.io is down
+    return new Provider(['https://rpc.koinos-testnet.com']);
   }, [walletState.isConnected]);
 
   // Get Kondor signer for transactions  
@@ -130,6 +126,7 @@ export function useKondorWallet() {
     }
 
     try {
+      // Get signer for testnet  
       return kondor.getSigner(walletState.address);
     } catch (error) {
       console.error('Error getting Kondor signer:', error);

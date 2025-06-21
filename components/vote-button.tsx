@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useKondorWallet } from '@/hooks/useKondorWallet';
+import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract } from '@/lib/utils';
-import { ThumbsUp, Loader2 } from 'lucide-react';
+import { ThumbsUp, Loader2, CheckCircle } from 'lucide-react';
+import { ProviderInterface, SignerInterface } from 'koilib';
+import toast from 'react-hot-toast';
 
 interface VoteButtonProps {
   projectId: number;
@@ -12,47 +14,58 @@ interface VoteButtonProps {
 }
 
 export function VoteButton({ projectId, onVoteSuccess }: VoteButtonProps) {
-  const { isConnected, address, getKondorProvider, signAndSendTransaction } = useKondorWallet();
+  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
   const [isVoting, setIsVoting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [justVoted, setJustVoted] = useState(false);
 
   const handleVote = async () => {
     if (!isConnected || !address) {
-      setError('Please connect your wallet first');
+      toast.error('Please connect your wallet first');
       return;
     }
 
     setIsVoting(true);
-    setError(null);
 
     try {
-      // Get the provider with Kondor
-      const provider = getKondorProvider();
+      // Get both provider and signer from Kondor
+      const provider = getKondorProvider() as ProviderInterface;
+      const signer = await getKondorSigner() as SignerInterface;
       
-      // Get the fund contract with the Kondor provider
-      const fund = getFundContract(
-        provider,
-        "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB" // Contract address
-      );
+      // Get the fund contract with both provider and signer
+      const fund = getFundContract(provider, "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB", signer);
 
-      // Prepare the vote transaction
-      const transaction = await fund.functions.update_vote({
+      // Show loading toast
+      const loadingToast = toast.loading('Submitting your vote...');
+
+      // Create and send the vote transaction
+      const { transaction, receipt } = await fund.functions.update_vote({
         voter: address,
         project_id: projectId,
         weight: 100, // Default vote weight, you can make this configurable
       });
-
-      // Sign and send the transaction using Kondor
-      const result = await signAndSendTransaction(transaction);
       
-      console.log('Vote transaction result:', result);
+      console.log('Vote transaction result:', { transaction, receipt });
+      
+      // Wait for the transaction to be mined (if transaction exists)
+      if (transaction) {
+        const { blockNumber } = await transaction.wait();
+        console.log(`Vote transaction mined in block ${blockNumber}`);
+      }
+      
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success('Vote submitted successfully!');
+      
+      // Show success state
+      setJustVoted(true);
+      setTimeout(() => setJustVoted(false), 2000);
       
       if (onVoteSuccess) {
         onVoteSuccess();
       }
     } catch (error) {
       console.error('Voting failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to vote');
+      toast.error(error instanceof Error ? error.message : 'Failed to vote');
     } finally {
       setIsVoting(false);
     }
@@ -60,7 +73,11 @@ export function VoteButton({ projectId, onVoteSuccess }: VoteButtonProps) {
 
   if (!isConnected) {
     return (
-      <Button variant="outline" disabled>
+      <Button 
+        variant="outline" 
+        disabled 
+        className="w-full h-11 rounded-xl font-medium text-sm border-border hover:border-border"
+      >
         <ThumbsUp className="w-4 h-4 mr-2" />
         Connect Wallet to Vote
       </Button>
@@ -68,22 +85,31 @@ export function VoteButton({ projectId, onVoteSuccess }: VoteButtonProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Button 
-        onClick={handleVote}
-        disabled={isVoting}
-        className="flex items-center gap-2"
-      >
-        {isVoting ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <ThumbsUp className="w-4 h-4" />
-        )}
-        {isVoting ? 'Voting...' : 'Vote'}
-      </Button>
-      {error && (
-        <p className="text-sm text-red-500">{error}</p>
+    <Button 
+      onClick={handleVote}
+      disabled={isVoting || justVoted}
+      className={`w-full h-11 rounded-xl font-medium text-sm transition-all duration-200 ${
+        justVoted 
+          ? 'bg-green-500 hover:bg-green-500 text-white' 
+          : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md'
+      }`}
+    >
+      {isVoting ? (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Voting...
+        </>
+      ) : justVoted ? (
+        <>
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Vote Submitted!
+        </>
+      ) : (
+        <>
+          <ThumbsUp className="w-4 h-4 mr-2" />
+          Vote for Project
+        </>
       )}
-    </div>
+    </Button>
   );
 } 

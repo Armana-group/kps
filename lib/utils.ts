@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from "clsx"
-import { Contract, Provider, ProviderInterface } from "koilib"
+import { Contract, Provider, ProviderInterface, SignerInterface } from "koilib"
 import { twMerge } from "tailwind-merge"
 import abiKoinosFund from "./abiKoinosFund"
 
@@ -33,11 +33,23 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getFundContract(
   provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
-  address: string = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB"
+  address: string = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB",
+  signer?: SignerInterface
 ): Contract {
-  return new Contract({
+  const contractOptions: {
+    id: string;
+    provider: ProviderInterface;
+    abi: typeof abiKoinosFund;
+    signer?: SignerInterface;
+  } = {
     id: address,
     provider,
     abi: abiKoinosFund,
-  });
+  };
+
+  if (signer) {
+    contractOptions.signer = signer;
+  }
+
+  return new Contract(contractOptions);
 }
