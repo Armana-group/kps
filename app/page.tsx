@@ -4,8 +4,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { KoinosLogo } from "@/components/koinos-logo";
 import { WalletConnect } from "@/components/wallet-connect";
 import { VoteButton } from "@/components/vote-button";
-import { getFundContract, ProjectStatus, OrderBy, Project } from "@/lib/utils";
+import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 
 // Interface for processed project data
 interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
@@ -13,19 +14,38 @@ interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date
   start_date: Date;
   end_date: Date;
   total_votes: string;
+  vote?: ProcessedVote;
 }
 
 export default function Home() {
   const pageSize = 10; // Number of projects to fetch per page
   const pageStart = "9".repeat(30); // Starting point for pagination
 
+  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
+  const [votes, setVotes] = useState<ProcessedVote[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchProjects = useCallback(async () => {
-    setLoading(true);
+  const fetchVotes = useCallback(async (): Promise<ProcessedVote[]> => {
+    if (!address) return [];
     const fund = getFundContract();
+    const votes = await fund.functions.get_user_votes<{ votes: Vote[] }>({
+      voter: address,
+    });
+
+    const processedVotes = (votes?.result?.votes || []).map(vote => ({
+      ...vote,
+      expiration: new Date(parseInt(vote.expiration)),
+    }));console.log("processedVotes", processedVotes);
+
+    setVotes(processedVotes);
+    return processedVotes;
+  }, [address]);
+
+  const fetchProjects = useCallback(async (currentVotes: ProcessedVote[]) => {
+    setLoading(true);
+    const fund = getFundContract();console.log("fetching projects");
     
     try {
       // Fetch active projects
@@ -43,6 +63,7 @@ export default function Home() {
         start_date: new Date(parseInt(project.start_date)),
         end_date: new Date(parseInt(project.end_date)),
         total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+        vote: currentVotes.find(v => v.project_id === project.id),
       }));
       
       setActiveProjects(processedActiveProjects);
@@ -62,6 +83,7 @@ export default function Home() {
         start_date: new Date(parseInt(project.start_date)),
         end_date: new Date(parseInt(project.end_date)),
         total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+        vote: currentVotes.find(v => v.project_id === project.id),
       }));
       
       setUpcomingProjects(processedUpcomingProjects);
@@ -71,11 +93,34 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageStart]);
+  }, [pageSize, pageStart, setActiveProjects, setUpcomingProjects]);
+
+  const fetchData = useCallback(async () => {
+    const currentVotes = await fetchVotes();
+    await fetchProjects(currentVotes);
+  }, [fetchVotes, fetchProjects]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    console.log("fetching votes, address:", address);
+    fetchVotes().then((processedVotes) => {
+      console.log("votes fetched");
+      if (!processedVotes) return;
+    
+      setActiveProjects(prevActive => prevActive.map(project => ({
+        ...project,
+        vote: processedVotes.find(v => v.project_id === project.id),
+      })));
+    
+      setUpcomingProjects(prevUpcoming => prevUpcoming.map(project => ({
+        ...project,
+        vote: processedVotes.find(v => v.project_id === project.id),
+      })));
+    });
+  }, [address, fetchVotes, setActiveProjects, setUpcomingProjects]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -129,6 +174,11 @@ export default function Home() {
                   key={project.id} 
                   className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
                 >
+                  {/* Project ID Badge */}
+                  <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
+                    #{project.id}
+                  </div>
+
                   {/* Project Header */}
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
@@ -172,7 +222,9 @@ export default function Home() {
                   <div className="pt-4 border-t border-border">
                     <VoteButton 
                       projectId={project.id} 
-                      onVoteSuccess={fetchProjects}
+                      projectTitle={project.title}
+                      vote={project.vote}
+                      onVoteSuccess={fetchData}
                     />
                   </div>
                 </article>
@@ -211,6 +263,11 @@ export default function Home() {
                   key={project.id} 
                   className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
                 >
+                  {/* Project ID Badge */}
+                  <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
+                    #{project.id}
+                  </div>
+
                   {/* Project Header */}
                   <div className="mb-4">
                     <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
@@ -221,7 +278,7 @@ export default function Home() {
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                         Upcoming
                       </span>
-                      <span>{project.votes.length} votes</span>
+                      <span>{project.total_votes} KOIN votes</span>
                     </div>
                   </div>
 

@@ -27,6 +27,16 @@ export interface Project {
   votes: string[];
 };
 
+export interface Vote {
+  project_id: number;
+  weight: number;
+  expiration: string;
+};
+
+export interface ProcessedVote extends Omit<Vote, 'expiration'> {
+  expiration: Date;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
