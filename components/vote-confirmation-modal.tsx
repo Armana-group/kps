@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ThumbsUp, Loader2 } from 'lucide-react';
+import { ThumbsUp, Loader2, Trash2 } from 'lucide-react';
 
 interface VoteConfirmationModalProps {
   isOpen: boolean;
@@ -150,13 +150,18 @@ export function VoteConfirmationModal({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isLoading || votePercentage[0] === 0}
+            disabled={isLoading}
             className="flex-1"
           >
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Submitting...
+              </>
+            ) : votePercentage[0] === 0 ? (
+              <>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Remove Vote
               </>
             ) : (
               <>

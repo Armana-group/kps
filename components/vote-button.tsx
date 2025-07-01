@@ -62,7 +62,7 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
       
       // Wait for the transaction to be mined (if transaction exists)
       if (transaction) {
-        const { blockNumber } = await transaction.wait();
+        const { blockNumber } = await provider.wait(transaction?.id!);
         console.log(`Vote transaction mined in block ${blockNumber}`);
       }
       
