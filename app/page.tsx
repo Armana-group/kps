@@ -4,7 +4,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { KoinosLogo } from "@/components/koinos-logo";
 import { WalletConnect } from "@/components/wallet-connect";
 import { VoteButton } from "@/components/vote-button";
-import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote } from "@/lib/utils";
+import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 
@@ -15,6 +15,8 @@ interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date
   end_date: Date;
   total_votes: string;
   vote?: ProcessedVote;
+  calculatedPayment?: number; // Amount this project will receive in next payment
+  paymentStatus?: 'full' | 'partial' | 'none'; // Payment status based on fund availability
 }
 
 export default function Home() {
@@ -26,6 +28,84 @@ export default function Home() {
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
   const [votes, setVotes] = useState<ProcessedVote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fundBalance, setFundBalance] = useState<number | null>(null);
+  const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
+
+  // Calculate payment distribution based on fund balance and project monthly payments
+  const calculatePaymentDistribution = useCallback((projects: ProcessedProject[], availableBalance: number) => {
+    if (availableBalance <= 0) {
+      return projects.map(project => ({
+        ...project,
+        calculatedPayment: 0,
+        paymentStatus: 'none' as const
+      }));
+    }
+
+    let remainingBalance = availableBalance;
+    const updatedProjects = [...projects];
+
+    // Sort projects by votes (highest first) to prioritize higher-voted projects
+    updatedProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
+
+    for (let i = 0; i < updatedProjects.length; i++) {
+      const project = updatedProjects[i];
+      const monthlyPayment = parseFloat(project.monthly_payment);
+      
+      if (parseFloat(project.total_votes) === 0) {
+        updatedProjects[i] = {
+          ...project,
+          calculatedPayment: 0,
+          paymentStatus: 'none' as const
+        };
+      } else if (remainingBalance >= monthlyPayment) {
+        // Full payment
+        updatedProjects[i] = {
+          ...project,
+          calculatedPayment: monthlyPayment,
+          paymentStatus: 'full' as const
+        };
+        remainingBalance -= monthlyPayment;
+      } else if (remainingBalance > 0) {
+        // Partial payment
+        updatedProjects[i] = {
+          ...project,
+          calculatedPayment: remainingBalance,
+          paymentStatus: 'partial' as const
+        };
+        remainingBalance = 0;
+      } else {
+        // No payment
+        updatedProjects[i] = {
+          ...project,
+          calculatedPayment: 0,
+          paymentStatus: 'none' as const
+        };
+      }
+    }
+
+    return updatedProjects;
+  }, []);
+
+  const fetchFundData = useCallback(async (): Promise<void> => {
+    // fund balance
+    const koin = getKoinContract();
+    const { result: balanceResult } = await koin.functions.balanceOf<{ value: string }>({
+      owner: FUND_ADDRESS,
+    });
+    const balance = parseInt(balanceResult?.value || "0") / 1e8;
+    setFundBalance(balance);
+    
+    // fund global vars
+    const fund = getFundContract();
+    const { result: globalVarsResult } = await fund.functions.get_global_vars<{
+      total_projects: number;
+      total_active_projects: number;
+      payment_times: string[];
+    }>();
+    const nextPaymentTime = globalVarsResult?.payment_times[0];
+    const nextPaymentTimeDate = nextPaymentTime ? new Date(parseInt(nextPaymentTime)) : null;
+    setNextPaymentTime(nextPaymentTimeDate);
+  }, []);
 
   const fetchVotes = useCallback(async (): Promise<ProcessedVote[]> => {
     if (!address) return [];
@@ -66,7 +146,9 @@ export default function Home() {
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
       
-      setActiveProjects(processedActiveProjects);
+      // Calculate payment distribution for active projects
+      const projectsWithPayments = calculatePaymentDistribution(processedActiveProjects, fundBalance || 0);
+      setActiveProjects(projectsWithPayments);
 
       // Fetch upcoming projects
       const upcomingResult = await fund.functions.get_projects<{ projects: Project[] }>({
@@ -93,12 +175,13 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, pageStart, setActiveProjects, setUpcomingProjects]);
+  }, [pageSize, pageStart, setActiveProjects, setUpcomingProjects, calculatePaymentDistribution, fundBalance]);
 
   const fetchData = useCallback(async () => {
     const currentVotes = await fetchVotes();
-    await fetchProjects(currentVotes);
-  }, [fetchVotes, fetchProjects]);
+    await fetchFundData(); // Fetch fund balance first
+    await fetchProjects(currentVotes); // Then calculate payments with the balance
+  }, [fetchVotes, fetchProjects, fetchFundData]);
 
   useEffect(() => {
     fetchData();
@@ -145,10 +228,42 @@ export default function Home() {
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-display mb-6 tracking-tight">
             Koinos Fund System
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
             Empowering the Koinos blockchain through community-driven funding decisions. 
             Vote on projects that shape the future of decentralized innovation.
           </p>
+          
+          {/* Fund Stats Display */}
+          <div className="inline-flex bg-card border border-border rounded-2xl px-8 py-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-8">
+              {/* Fund Balance */}
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-primary rounded-full"></div>
+                <div className="text-left">
+                  <p className="text-sm text-muted-foreground font-medium">Fund Balance</p>
+                  <p className="text-2xl font-bold font-mono">
+                    {fundBalance !== null ? `${fundBalance.toLocaleString()} KOIN` : 'Loading...'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Next Payment Time */}
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="text-left">
+                  <p className="text-sm text-muted-foreground font-medium">Next Payment</p>
+                  <p className="text-2xl font-bold font-mono">
+                    {nextPaymentTime ? nextPaymentTime.toLocaleDateString() : 'Loading...'}
+                  </p>
+                  {nextPaymentTime && (
+                    <p className="text-xs text-muted-foreground">
+                      {nextPaymentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -217,6 +332,33 @@ export default function Home() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Next Payment Information */}
+                  {project.calculatedPayment !== undefined && (
+                    <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-muted-foreground">Next Payment</span>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          project.paymentStatus === 'full' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                          project.paymentStatus === 'partial' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                          {project.paymentStatus === 'full' ? 'Full Payment' :
+                           project.paymentStatus === 'partial' ? 'Partial Payment' : 'No Payment'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold font-mono">
+                          {project.calculatedPayment.toFixed(8)} KOIN
+                        </span>
+                        {project.paymentStatus === 'partial' && (
+                          <span className="text-xs text-muted-foreground">
+                            {((project.calculatedPayment / parseFloat(project.monthly_payment)) * 100).toFixed(1)}% of requested
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Vote Button */}
                   <div className="pt-4 border-t border-border">

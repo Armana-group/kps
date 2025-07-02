@@ -46,7 +46,7 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
       const signer = await getKondorSigner() as SignerInterface;
       
       // Get the fund contract with both provider and signer
-      const fund = getFundContract(provider, "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB", signer);
+      const fund = getFundContract(provider, signer);
 
       // Show loading toast
       const loadingToast = toast.loading('Submitting your vote...');

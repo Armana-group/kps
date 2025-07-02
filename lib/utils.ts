@@ -1,7 +1,10 @@
 import { clsx, type ClassValue } from "clsx"
-import { Contract, Provider, ProviderInterface, SignerInterface } from "koilib"
+import { Contract, Provider, ProviderInterface, SignerInterface, utils } from "koilib"
 import { twMerge } from "tailwind-merge"
 import abiKoinosFund from "./abiKoinosFund"
+
+export const KOIN_ADDRESS = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
+export const FUND_ADDRESS = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB";
 
 export enum ProjectStatus {
   Upcoming = 0,
@@ -43,7 +46,6 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getFundContract(
   provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
-  address: string = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB",
   signer?: SignerInterface
 ): Contract {
   const contractOptions: {
@@ -52,7 +54,7 @@ export function getFundContract(
     abi: typeof abiKoinosFund;
     signer?: SignerInterface;
   } = {
-    id: address,
+    id: FUND_ADDRESS,
     provider,
     abi: abiKoinosFund,
   };
@@ -62,4 +64,36 @@ export function getFundContract(
   }
 
   return new Contract(contractOptions);
+}
+
+export function getKoinContract(
+  provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
+  signer?: SignerInterface
+): Contract {
+  const { tokenAbi } = utils;
+  delete (tokenAbi as unknown as {
+    koilib_types: {
+      nested: {
+        koinos: {
+          nested: {
+            btype?: {
+              type: string;
+              id: number;
+            };
+          };
+        };
+      };
+    };
+  }).koilib_types.nested?.koinos?.nested?.btype;
+  const contract = new Contract({
+    id: KOIN_ADDRESS,
+    provider,
+    abi: tokenAbi,
+  });
+
+  if (signer) {
+    contract.signer = signer;
+  }
+
+  return contract;
 }
