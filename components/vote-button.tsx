@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract, ProcessedVote } from '@/lib/utils';
-import { ThumbsUp, Loader2, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { ThumbsUp, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { ProviderInterface, SignerInterface } from 'koilib';
 import toast from 'react-hot-toast';
 import { VoteConfirmationModal } from '@/components/vote-confirmation-modal';
@@ -61,8 +61,8 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
       console.log('Vote transaction result:', { transaction, receipt });
       
       // Wait for the transaction to be mined (if transaction exists)
-      if (transaction) {
-        const { blockNumber } = await provider.wait(transaction?.id!);
+      if (transaction?.id) {
+        const { blockNumber } = await provider.wait(transaction.id);
         console.log(`Vote transaction mined in block ${blockNumber}`);
       }
       
