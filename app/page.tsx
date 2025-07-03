@@ -23,10 +23,10 @@ export default function Home() {
   const pageSize = 10; // Number of projects to fetch per page
   const pageStart = "9".repeat(30); // Starting point for pagination
 
-  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
+  const { address } = useKondorWalletContext();
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
-  const [votes, setVotes] = useState<ProcessedVote[]>([]);
+  const [, setVotes] = useState<ProcessedVote[]>([]);
   const [loading, setLoading] = useState(true);
   const [fundBalance, setFundBalance] = useState<number | null>(null);
   const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
