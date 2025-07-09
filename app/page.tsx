@@ -30,7 +30,7 @@ export default function Home() {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
-  const [votes, setVotes] = useState<ProcessedVote[]>([]);
+  const [, setVotes] = useState<ProcessedVote[]>([]);
   const [loading, setLoading] = useState(true);
   const [fundBalance, setFundBalance] = useState<number | null>(null);
   const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
