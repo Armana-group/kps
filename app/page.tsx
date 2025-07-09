@@ -4,6 +4,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { KoinosLogo } from "@/components/koinos-logo";
 import { WalletConnect } from "@/components/wallet-connect";
 import { VoteButton } from "@/components/vote-button";
+import { SubmitProjectModal } from "@/components/submit-project-modal";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
@@ -24,6 +27,7 @@ export default function Home() {
   const pageStart = "9".repeat(30); // Starting point for pagination
 
   const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
   const [votes, setVotes] = useState<ProcessedVote[]>([]);
@@ -142,7 +146,7 @@ export default function Home() {
         monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
         start_date: new Date(parseInt(project.start_date)),
         end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
       
@@ -164,7 +168,7 @@ export default function Home() {
         monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
         start_date: new Date(parseInt(project.start_date)),
         end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 1e8).toFixed(8),
+        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
       
@@ -204,6 +208,10 @@ export default function Home() {
       })));
     });
   }, [address, fetchVotes, setActiveProjects, setUpcomingProjects]);
+
+  const handleProjectSubmissionSuccess = () => {
+    fetchData(); // Refresh the data after successful submission
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -463,7 +471,33 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {/* Submit New Project Section */}
+        <section className="mt-20 text-center">
+          <div className="max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">Submit Your Project</h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              Have a great idea for the Koinos ecosystem? Submit your project for community voting and funding.
+            </p>
+            
+            <Button
+              onClick={() => setIsSubmitModalOpen(true)}
+              size="lg"
+              className="px-8 py-3 text-lg"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Submit New Project
+            </Button>
+          </div>
+        </section>
       </main>
+
+      {/* Submit Project Modal */}
+      <SubmitProjectModal
+        isOpen={isSubmitModalOpen}
+        onClose={() => setIsSubmitModalOpen(false)}
+        onSuccess={handleProjectSubmissionSuccess}
+      />
     </div>
   );
 }
