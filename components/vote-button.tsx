@@ -40,16 +40,13 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
 
     setIsVoting(true);
 
-    try {
+    const submitVote = async () => {
       // Get both provider and signer from Kondor
       const provider = getKondorProvider() as ProviderInterface;
       const signer = await getKondorSigner() as SignerInterface;
-      
+
       // Get the fund contract with both provider and signer
       const fund = getFundContract(provider, signer);
-
-      // Show loading toast
-      const loadingToast = toast.loading('Submitting your vote...');
 
       // Create and send the vote transaction
       const { transaction, receipt } = await fund.functions.update_vote({
@@ -57,32 +54,59 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
         project_id: projectId,
         weight: votePercentage / 5, // Use the selected vote percentage
       });
-      
+
       console.log('Vote transaction result:', { transaction, receipt });
-      
+
       // Wait for the transaction to be mined (if transaction exists)
       if (transaction?.id) {
         const { blockNumber } = await provider.wait(transaction.id);
         console.log(`Vote transaction mined in block ${blockNumber}`);
       }
-      
-      // Dismiss loading toast and show success
-      toast.dismiss(loadingToast);
-      toast.success('Vote submitted successfully!');
-      
-      // Show success state
+
+      return { transaction, votePercentage };
+    };
+
+    try {
+      await toast.promise(
+        submitVote(),
+        {
+          loading: 'Submitting your vote...',
+          success: (data) => `Vote of ${data.votePercentage}% submitted successfully!`,
+          error: 'Failed to submit vote. Please try again.',
+        },
+        {
+          style: {
+            minWidth: '250px',
+          },
+          success: {
+            duration: 4000,
+            icon: '🗳️',
+          },
+          error: {
+            duration: 6000,
+          },
+        }
+      );
+
+            // Show success state
       setJustVoted(true);
-      setTimeout(() => setJustVoted(false), 2000);
-      
+
       // Close the modal
       setIsModalOpen(false);
-      
+
+      // Call the success callback to refresh data
       if (onVoteSuccess) {
         onVoteSuccess();
       }
+
+      // Reset the success state after 3 seconds
+      setTimeout(() => {
+        setJustVoted(false);
+      }, 3000);
+
     } catch (error) {
-      console.error('Voting failed:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to vote');
+      console.error('Error voting:', error);
+      // Error is already handled by toast.promise
     } finally {
       setIsVoting(false);
     }
@@ -92,7 +116,7 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
   const formatExpiration = (expiration: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((expiration.getTime() - now.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) {
       const diffInMinutes = Math.floor((expiration.getTime() - now.getTime()) / (1000 * 60));
       return `${diffInMinutes}m`;
@@ -172,7 +196,7 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
 
   return (
     <>
-      <Button 
+      <Button
         variant={buttonState.variant}
         onClick={handleVoteClick}
         disabled={buttonState.disabled}
@@ -192,4 +216,4 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
       />
     </>
   );
-} 
+}

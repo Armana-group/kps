@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -58,16 +58,7 @@ export function SubmitProjectModal({
 
   const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
 
-  // Calculate fee when form data changes
-  useEffect(() => {
-    if (formData.start_date && formData.end_date) {
-      calculateFee();
-    } else {
-      setCalculatedFee('');
-    }
-  }, [formData.start_date, formData.end_date]);
-
-  const calculateFee = async () => {
+  const calculateFee = useCallback(async () => {
     if (!formData.start_date || !formData.end_date) {
       setCalculatedFee('');
       return;
@@ -80,7 +71,7 @@ export function SubmitProjectModal({
 
       // Get global vars from the fund contract
       const { result: globalVars } = await fund.functions.get_global_vars<GlobalVars>();
-      
+
       if (!globalVars) {
         throw new Error('Failed to fetch global variables');
       }
@@ -103,7 +94,16 @@ export function SubmitProjectModal({
     } finally {
       setIsCalculatingFee(false);
     }
-  };
+  }, [formData.start_date, formData.end_date, getKondorProvider]);
+
+  // Calculate fee when form data changes
+  useEffect(() => {
+    if (formData.start_date && formData.end_date) {
+      calculateFee();
+    } else {
+      setCalculatedFee('');
+    }
+  }, [formData.start_date, formData.end_date, calculateFee]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<ProjectFormData> = {};
@@ -200,13 +200,13 @@ export function SubmitProjectModal({
       });
 
       console.log('project submission result:', { transaction, receipt });
-      
+
       // Wait for the transaction to be mined (if transaction exists)
-      if (transaction) {
-        const { blockNumber } = await provider.wait(transaction?.id!);
+      if (transaction?.id) {
+        const { blockNumber } = await provider.wait(transaction.id);
         console.log(`project submission transaction mined in block ${blockNumber}`);
       }
-      
+
       toast.success('Project submitted successfully!');
       onSuccess?.();
       onClose();
@@ -246,7 +246,7 @@ export function SubmitProjectModal({
             Submit a new project for community voting. All fields are required.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6 py-4">
           {/* Title */}
           <div className="space-y-2">
@@ -280,8 +280,8 @@ export function SubmitProjectModal({
               placeholder="Describe your project in detail..."
               rows={4}
               className={`w-full min-h-[100px] px-3 py-2 text-sm border rounded-md bg-transparent transition-colors resize-none ${
-                errors.description 
-                  ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/50' 
+                errors.description
+                  ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/50'
                   : 'border-input focus-visible:border-ring focus-visible:ring-ring/50'
               } focus-visible:outline-none focus-visible:ring-[3px]`}
             />
@@ -436,4 +436,4 @@ export function SubmitProjectModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}

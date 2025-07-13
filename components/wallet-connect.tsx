@@ -16,8 +16,8 @@ export function WalletConnect() {
 
   if (!isKondorInstalled) {
     return (
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         className="h-10 px-4 rounded-xl font-medium text-sm border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
         onClick={() => window.open('https://chrome.google.com/webstore/detail/kondor/ghipkefkpgkladckmlmdnadmcchefhjl', '_blank')}
       >
@@ -39,14 +39,15 @@ export function WalletConnect() {
           <span className="text-sm text-destructive">{error}</span>
         </div>
       )}
-      <Button 
+      <Button
         onClick={connect}
         disabled={isConnecting}
-        className="h-10 px-4 rounded-xl font-medium text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md transition-all duration-200"
+        variant="ghost"
+        size="icon"
+        className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all duration-200"
       >
-        <Wallet className="w-4 h-4 mr-2" />
-        {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+        <Wallet className="w-4 h-4" />
       </Button>
     </div>
   );
-} 
+}
