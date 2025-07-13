@@ -1,12 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { KoinosLogo } from "@/components/koinos-logo";
-import { WalletConnect } from "@/components/wallet-connect";
 import { VoteButton } from "@/components/vote-button";
-import { SubmitProjectModal } from "@/components/submit-project-modal";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
@@ -26,8 +20,7 @@ export default function Home() {
   const pageSize = 10; // Number of projects to fetch per page
   const pageStart = "9".repeat(30); // Starting point for pagination
 
-  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const { address } = useKondorWalletContext();
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
   const [, setVotes] = useState<ProcessedVote[]>([]);
@@ -54,7 +47,7 @@ export default function Home() {
     for (let i = 0; i < updatedProjects.length; i++) {
       const project = updatedProjects[i];
       const monthlyPayment = parseFloat(project.monthly_payment);
-      
+
       if (parseFloat(project.total_votes) === 0) {
         updatedProjects[i] = {
           ...project,
@@ -98,7 +91,7 @@ export default function Home() {
     });
     const balance = parseInt(balanceResult?.value || "0") / 1e8;
     setFundBalance(balance);
-    
+
     // fund global vars
     const fund = getFundContract();
     const { result: globalVarsResult } = await fund.functions.get_global_vars<{
@@ -130,7 +123,7 @@ export default function Home() {
   const fetchProjects = useCallback(async (currentVotes: ProcessedVote[]) => {
     setLoading(true);
     const fund = getFundContract();console.log("fetching projects");
-    
+
     try {
       // Fetch active projects
       const activeResult = await fund.functions.get_projects<{ projects: Project[] }>({
@@ -140,7 +133,7 @@ export default function Home() {
         start: pageStart,
         descending: true,
       });
-      
+
       const processedActiveProjects = (activeResult?.result?.projects || []).map(project => ({
         ...project,
         monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
@@ -149,7 +142,7 @@ export default function Home() {
         total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
-      
+
       // Calculate payment distribution for active projects
       const projectsWithPayments = calculatePaymentDistribution(processedActiveProjects, fundBalance || 0);
       setActiveProjects(projectsWithPayments);
@@ -162,7 +155,7 @@ export default function Home() {
         start: pageStart,
         descending: true,
       });
-      
+
       const processedUpcomingProjects = (upcomingResult?.result?.projects || []).map(project => ({
         ...project,
         monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
@@ -171,7 +164,7 @@ export default function Home() {
         total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
-      
+
       setUpcomingProjects(processedUpcomingProjects);
     } catch (error) {
       console.error("Error fetching projects:", error);
@@ -196,12 +189,12 @@ export default function Home() {
     fetchVotes().then((processedVotes) => {
       console.log("votes fetched");
       if (!processedVotes) return;
-    
+
       setActiveProjects(prevActive => prevActive.map(project => ({
         ...project,
         vote: processedVotes.find(v => v.project_id === project.id),
       })));
-    
+
       setUpcomingProjects(prevUpcoming => prevUpcoming.map(project => ({
         ...project,
         vote: processedVotes.find(v => v.project_id === project.id),
@@ -209,27 +202,11 @@ export default function Home() {
     });
   }, [address, fetchVotes, setActiveProjects, setUpcomingProjects]);
 
-  const handleProjectSubmissionSuccess = () => {
-    fetchData(); // Refresh the data after successful submission
-  };
+
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <KoinosLogo width={32} height={31} />
-            <span className="text-xl font-semibold font-display">KFS</span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <WalletConnect />
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-      
+
       {/* Hero Section */}
       <section className="relative py-20 lg:py-32">
         <div className="max-w-4xl mx-auto px-6 text-center">
@@ -237,10 +214,10 @@ export default function Home() {
             Koinos Fund System
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
-            Empowering the Koinos blockchain through community-driven funding decisions. 
+            Empowering the Koinos blockchain through community-driven funding decisions.
             Vote on projects that shape the future of decentralized innovation.
           </p>
-          
+
           {/* Fund Stats Display */}
           <div className="inline-flex bg-card border border-border rounded-2xl px-8 py-6 shadow-sm">
             <div className="flex flex-col sm:flex-row gap-8">
@@ -293,8 +270,8 @@ export default function Home() {
           ) : activeProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activeProjects.map((project) => (
-                <article 
-                  key={project.id} 
+                <article
+                  key={project.id}
                   className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
                 >
                   {/* Project ID Badge */}
@@ -370,8 +347,8 @@ export default function Home() {
 
                   {/* Vote Button */}
                   <div className="pt-4 border-t border-border">
-                    <VoteButton 
-                      projectId={project.id} 
+                    <VoteButton
+                      projectId={project.id}
                       projectTitle={project.title}
                       vote={project.vote}
                       onVoteSuccess={fetchData}
@@ -409,8 +386,8 @@ export default function Home() {
           ) : upcomingProjects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {upcomingProjects.map((project) => (
-                <article 
-                  key={project.id} 
+                <article
+                  key={project.id}
                   className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
                 >
                   {/* Project ID Badge */}
@@ -472,32 +449,10 @@ export default function Home() {
           )}
         </section>
 
-        {/* Submit New Project Section */}
-        <section className="mt-20 text-center">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">Submit Your Project</h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Have a great idea for the Koinos ecosystem? Submit your project for community voting and funding.
-            </p>
-            
-            <Button
-              onClick={() => setIsSubmitModalOpen(true)}
-              size="lg"
-              className="px-8 py-3 text-lg"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Submit New Project
-            </Button>
-          </div>
-        </section>
+
       </main>
 
-      {/* Submit Project Modal */}
-      <SubmitProjectModal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        onSuccess={handleProjectSubmissionSuccess}
-      />
+
     </div>
   );
 }
