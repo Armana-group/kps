@@ -1,11 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Vote, Wallet, FileText, DollarSign, Users, Shield, Zap } from "lucide-react";
+import { ArrowLeft, ExternalLink, Vote, Wallet, FileText, DollarSign, Users, Shield, Zap, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function DocsPage() {
   const router = useRouter();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const tableOfContents = [
     { id: "overview", title: "Project Overview", number: 1 },
@@ -22,12 +24,38 @@ export default function DocsPage() {
   return (
     <div className="min-h-screen bg-background scroll-smooth">
       <div className="flex">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="lg:hidden fixed top-20 left-4 z-50 p-2 rounded-md bg-background/95 backdrop-blur border border-border/50 hover:bg-accent/50 transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Mobile Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
         {/* Sidebar Table of Contents */}
-        <div className="w-64 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-border/50 bg-card/30 backdrop-blur-sm z-10">
+        <div className={`
+          w-64 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-border/50 bg-card/30 backdrop-blur-sm z-50
+          ${isMobileMenuOpen ? 'fixed left-0' : 'hidden lg:block'}
+        `}>
           <div className="p-6 sticky top-0">
             <div className="flex items-center gap-2 mb-6">
               <FileText className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">Contents</h2>
+              {/* Mobile Close Button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="lg:hidden ml-auto p-1 rounded-md hover:bg-accent/50 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <nav className="space-y-2">
@@ -35,6 +63,7 @@ export default function DocsPage() {
                 <a
                   key={item.id}
                   href={`#${item.id}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted/50 transition-colors group"
                 >
                   <div className="w-6 h-6 bg-primary/10 group-hover:bg-primary/20 rounded-full flex items-center justify-center text-xs font-medium text-primary">
@@ -50,18 +79,18 @@ export default function DocsPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1">
-          <main className="max-w-4xl mx-auto px-6 py-12">
+        <div className="flex-1 lg:flex-1">
+          <main className="max-w-4xl mx-auto px-4 lg:px-6 py-6 lg:py-12">
             {/* Hero Section */}
-            <section className="text-center mb-16">
-              <h1 className="text-4xl md:text-5xl font-bold font-display mb-6 tracking-tight">
+            <section className="text-center mb-8 lg:mb-16">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display mb-4 lg:mb-6 tracking-tight">
                 Koinos Fund System
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+              <p className="text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-6 lg:mb-8">
                 A comprehensive guide to using the Koinos Fund System (KFS) - the decentralized funding platform
                 that empowers the Koinos blockchain community through democratic project funding.
               </p>
-              <div className="flex justify-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-center gap-3 lg:gap-4">
                 <Button onClick={() => router.push('/')} className="h-10 px-5 py-2 rounded-lg">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Platform
@@ -74,13 +103,13 @@ export default function DocsPage() {
             </section>
 
             {/* Project Overview */}
-            <section id="overview" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
+            <section id="overview" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">1</div>
-                <h2 className="text-3xl font-bold">Project Overview</h2>
+                <h2 className="text-2xl lg:text-3xl font-bold">Project Overview</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-8">
                   <div>
                     <h3 className="text-2xl font-semibold mb-4 flex items-center gap-3">
@@ -102,7 +131,7 @@ export default function DocsPage() {
                       Traditional blockchain funding mechanisms often suffer from centralization, lack of transparency, and limited community input.
                       The KFS was created to address these fundamental issues by providing:
                     </p>
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div className="grid sm:grid-cols-2 gap-4 lg:gap-6">
                       <div className="space-y-4">
                         <div className="flex items-start gap-3">
                           <Shield className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
@@ -182,7 +211,7 @@ export default function DocsPage() {
                       <Users className="w-6 h-6 text-primary" />
                       Who benefits?
                     </h3>
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                       <div className="text-center p-4 bg-muted/30 rounded-lg">
                         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                           <FileText className="w-6 h-6 text-primary" />
@@ -197,7 +226,7 @@ export default function DocsPage() {
                         <h4 className="font-semibold mb-2">Community</h4>
                         <p className="text-sm text-muted-foreground">Participate in governance and shape the future of the Koinos ecosystem.</p>
                       </div>
-                      <div className="text-center p-4 bg-muted/30 rounded-lg">
+                      <div className="text-center p-4 bg-muted/30 rounded-lg sm:col-span-2 lg:col-span-1">
                         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                           <Zap className="w-6 h-6 text-primary" />
                         </div>
@@ -211,19 +240,19 @@ export default function DocsPage() {
             </section>
 
             {/* Getting Started */}
-            <section id="getting-started" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
+            <section id="getting-started" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">2</div>
-                <h2 className="text-3xl font-bold">Getting Started</h2>
+                <h2 className="text-2xl lg:text-3xl font-bold">Getting Started</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <p className="text-lg text-muted-foreground mb-6">
                   The Koinos Fund System (KFS) is a decentralized platform where the Koinos community can propose,
                   vote on, and fund projects that benefit the Koinos blockchain ecosystem.
                 </p>
 
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="grid sm:grid-cols-2 gap-6 lg:gap-8">
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">What You Can Do</h3>
                     <ul className="space-y-3">
@@ -263,13 +292,13 @@ export default function DocsPage() {
             </section>
 
             {/* Wallet Setup */}
-            <section id="wallet-setup" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">2</div>
-                <h2 className="text-3xl font-bold">Wallet Setup</h2>
+            <section id="wallet-setup" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">3</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Wallet Setup</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <Wallet className="w-6 h-6 text-primary" />
@@ -311,19 +340,19 @@ export default function DocsPage() {
             </section>
 
             {/* Browsing Projects */}
-            <section id="browsing-projects" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">3</div>
-                <h2 className="text-3xl font-bold">Browsing Projects</h2>
+            <section id="browsing-projects" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">4</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Browsing Projects</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <p className="text-lg text-muted-foreground">
                     The KFS platform displays projects in two main categories:
                   </p>
 
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -367,13 +396,13 @@ export default function DocsPage() {
             </section>
 
             {/* Voting System */}
-            <section id="voting-system" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">4</div>
-                <h2 className="text-3xl font-bold">Voting System</h2>
+            <section id="voting-system" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">5</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Voting System</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <Vote className="w-6 h-6 text-primary" />
@@ -419,13 +448,13 @@ export default function DocsPage() {
             </section>
 
             {/* Submitting Projects */}
-            <section id="submitting-projects" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">5</div>
-                <h2 className="text-3xl font-bold">Submitting Projects</h2>
+            <section id="submitting-projects" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">6</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Submitting Projects</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <FileText className="w-6 h-6 text-primary" />
@@ -477,13 +506,13 @@ export default function DocsPage() {
             </section>
 
             {/* Funding Mechanism */}
-            <section id="funding-mechanism" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">6</div>
-                <h2 className="text-3xl font-bold">Funding Mechanism</h2>
+            <section id="funding-mechanism" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">7</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Funding Mechanism</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <DollarSign className="w-6 h-6 text-primary" />
@@ -528,20 +557,20 @@ export default function DocsPage() {
             </section>
 
             {/* Fees & Costs */}
-            <section id="fees-costs" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">7</div>
-                <h2 className="text-3xl font-bold">Fees & Costs</h2>
+            <section id="fees-costs" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">8</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Fees & Costs</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <DollarSign className="w-6 h-6 text-primary" />
                     <h3 className="text-xl font-semibold">Understanding Costs</h3>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <h4 className="font-medium">Submission Fees</h4>
                       <p className="text-sm text-muted-foreground">
@@ -582,13 +611,13 @@ export default function DocsPage() {
             </section>
 
             {/* FAQ */}
-            <section id="faq" className="mb-16 scroll-mt-20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">8</div>
-                <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
+            <section id="faq" className="mb-8 lg:mb-16 scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold">9</div>
+                <h2 className="text-2xl lg:text-3xl font-bold">Frequently Asked Questions</h2>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-8">
+              <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-4 lg:p-8">
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <div className="border-l-4 border-primary pl-4">
