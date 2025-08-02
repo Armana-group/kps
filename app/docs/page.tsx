@@ -229,7 +229,7 @@ export default function DocsPage() {
                     <ul className="space-y-3">
                       <li className="flex items-start gap-3">
                         <Vote className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                        <span>Vote on projects using your KOIN tokens</span>
+                        <span>Vote on projects using your KOIN tokens or VHP tokens (without spending them)</span>
                       </li>
                       <li className="flex items-start gap-3">
                         <FileText className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -250,7 +250,7 @@ export default function DocsPage() {
                       </li>
                       <li className="flex items-start gap-3">
                         <DollarSign className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                        <span>KOIN tokens for voting and fees</span>
+                        <span>KOIN tokens or VHP tokens for voting</span>
                       </li>
                       <li className="flex items-start gap-3">
                         <Users className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -384,14 +384,21 @@ export default function DocsPage() {
                     <div className="bg-muted/50 rounded-lg p-4">
                       <p className="font-medium mb-2">Vote Weight</p>
                       <p className="text-sm text-muted-foreground">
-                        Your vote weight is determined by your KOIN token balance. You can vote with 5%, 10%, 15%, or 20% of your tokens.
+                        Each KOIN and each VHP counts as one vote. You can allocate all your votes to a single project or distribute them among multiple projects (fractions of 5%).
                       </p>
                     </div>
 
                     <div className="bg-muted/50 rounded-lg p-4">
                       <p className="font-medium mb-2">Vote Duration</p>
                       <p className="text-sm text-muted-foreground">
-                        Votes are time-limited and will expire. You can renew expired votes or change your vote percentage at any time.
+                        Votes are time-limited and will expire in 6 months. You can renew expired votes or change your vote percentage at any time.
+                      </p>
+                    </div>
+
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="font-medium mb-2">Tokens are not locked</p>
+                      <p className="text-sm text-muted-foreground">
+                        KOIN and VHP tokens are not locked, you can transfer them at any time. Whenever you make a transfer, your votes are automatically updated.
                       </p>
                     </div>
 
@@ -408,8 +415,8 @@ export default function DocsPage() {
                     <h4 className="font-medium text-primary mb-2">Voting Steps</h4>
                     <ol className="text-sm space-y-1 list-decimal list-inside">
                       <li>Connect your Kondor wallet</li>
-                                              <li>Click &quot;Vote for Project&quot; on any project</li>
-                      <li>Choose your vote percentage (5%, 10%, 15%, or 20%)</li>
+                      <li>Click &quot;Vote for Project&quot; on any project</li>
+                      <li>Choose your vote percentage (5%, 10%, 15%, etc.)</li>
                       <li>Confirm the transaction in your wallet</li>
                       <li>Wait for transaction confirmation</li>
                     </ol>
@@ -555,14 +562,12 @@ export default function DocsPage() {
                     </div>
 
                     <div className="space-y-3">
-                      <h4 className="font-medium">Transaction Fees</h4>
+                      <h4 className="font-medium">No Voting Fees</h4>
                       <p className="text-sm text-muted-foreground">
-                        Standard Koinos network fees apply for:
+                        There are no fees for voting.
                       </p>
                       <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Voting transactions</li>
-                        <li>• Project submissions</li>
-                        <li>• Wallet operations</li>
+                        <li>• Votes are free, you just need to hold KOIN or VHP.</li>
                       </ul>
                     </div>
                   </div>
