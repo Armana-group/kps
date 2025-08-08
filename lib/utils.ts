@@ -3,8 +3,15 @@ import { Contract, Provider, ProviderInterface, SignerInterface, utils } from "k
 import { twMerge } from "tailwind-merge"
 import abiKoinosFund from "./abiKoinosFund"
 
-export const KOIN_ADDRESS = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
-export const FUND_ADDRESS = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB";
+// const RPC_TESTNET = "https://rpc.koinos-testnet.com";
+// const RPC_MAINNET = "https://api.koinos.io";
+
+// export const KOIN_ADDRESS = "1FaSvLjQJsCJKq5ybmGsMMQs8RQYyVv8ju";
+// export const FUND_ADDRESS = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB";
+
+export const KOIN_ADDRESS = "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK";
+export const FUND_ADDRESS = "1CKjc3SWeHt3Bftub7EsuG5sQaq7xNQj5U";
+
 
 export enum ProjectStatus {
   Upcoming = 0,
@@ -45,7 +52,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getFundContract(
-  provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
+  provider: ProviderInterface = new Provider("https://api.koinos.io"),
   signer?: SignerInterface
 ): Contract {
   const contractOptions: {
@@ -67,7 +74,7 @@ export function getFundContract(
 }
 
 export function getKoinContract(
-  provider: ProviderInterface = new Provider("https://rpc.koinos-testnet.com"),
+  provider: ProviderInterface = new Provider("https://api.koinos.io"),
   signer?: SignerInterface
 ): Contract {
   const { tokenAbi } = utils;
