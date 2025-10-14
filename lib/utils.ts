@@ -10,7 +10,7 @@ import abiKoinosFund from "./abiKoinosFund"
 // export const FUND_ADDRESS = "18h1MU6z4LkD7Lk2BohhejA9j61TDUwvRB";
 
 export const KOIN_ADDRESS = "19GYjDBVXU7keLbYvMLazsGQn3GTWHjHkK";
-export const FUND_ADDRESS = "1CKjc3SWeHt3Bftub7EsuG5sQaq7xNQj5U";
+export const FUND_ADDRESS = "1A5BmMqV5jN5zBrdkhQumAfDZBzXLPBeN9";
 
 
 export enum ProjectStatus {
