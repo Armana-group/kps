@@ -114,8 +114,8 @@ export default function Home() {
 
     const processedVotes = (votes?.result?.votes || []).map(vote => ({
       ...vote,
-      expiration: new Date(parseInt(vote.expiration)),
-    }));console.log("processedVotes", processedVotes);
+      expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
+    }));
 
     setVotes(processedVotes);
     return processedVotes;
