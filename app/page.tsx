@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -281,9 +282,11 @@ export default function Home() {
 
                   {/* Project Header */}
                   <div className="mb-4">
-                    <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                      {project.title}
-                    </h3>
+                    <Link href={`/projects/${project.id}`}>
+                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                        {project.title}
+                      </h3>
+                    </Link>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -397,9 +400,11 @@ export default function Home() {
 
                   {/* Project Header */}
                   <div className="mb-4">
-                    <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                      {project.title}
-                    </h3>
+                    <Link href={`/projects/${project.id}`}>
+                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                        {project.title}
+                      </h3>
+                    </Link>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
