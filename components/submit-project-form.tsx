@@ -186,7 +186,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
       // Convert monthly payment to the correct format (multiply by 1e8)
       const monthlyPaymentInKoin = parseFloat(formData.monthly_payment);
-      const monthlyPaymentInSmallestUnit = Math.floor(monthlyPaymentInKoin * 1e8);
+      const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
       const startTimestamp = new Date(formData.start_date).getTime();
@@ -194,7 +194,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
       // Convert calculated fee to smallest unit
       const feeInKoin = parseFloat(calculatedFee);
-      const feeInSmallestUnit = Math.floor(feeInKoin * 1e8);
+      const feeInSmallestUnit = Math.ceil(feeInKoin * 1e8);
 
       // Approve transfer
       const { operation: approveOperation } = await koin.functions.approve({
