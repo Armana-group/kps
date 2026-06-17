@@ -116,7 +116,7 @@ export function useKondorWallet() {
     }
 
     // Use the working testnet RPC directly since harbinger-api.koinos.io is down
-    return new Provider(['https://rpc.koinos-testnet.com']);
+    return new Provider(['https://api.koinos.io']);
   }, [walletState.isConnected]);
 
   // Get Kondor signer for transactions  

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -83,7 +84,7 @@ export default function Home() {
     return updatedProjects;
   }, []);
 
-  const fetchFundData = useCallback(async (): Promise<void> => {
+  const fetchFundData = useCallback(async (): Promise<Date | null> => {
     // fund balance
     const koin = getKoinContract();
     const { result: balanceResult } = await koin.functions.balanceOf<{ value: string }>({
@@ -102,6 +103,7 @@ export default function Home() {
     const nextPaymentTime = globalVarsResult?.payment_times[0];
     const nextPaymentTimeDate = nextPaymentTime ? new Date(parseInt(nextPaymentTime)) : null;
     setNextPaymentTime(nextPaymentTimeDate);
+    return nextPaymentTimeDate;
   }, []);
 
   const fetchVotes = useCallback(async (): Promise<ProcessedVote[]> => {
@@ -113,28 +115,47 @@ export default function Home() {
 
     const processedVotes = (votes?.result?.votes || []).map(vote => ({
       ...vote,
-      expiration: new Date(parseInt(vote.expiration)),
-    }));console.log("processedVotes", processedVotes);
+      expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
+    }));
 
     setVotes(processedVotes);
     return processedVotes;
   }, [address]);
 
-  const fetchProjects = useCallback(async (currentVotes: ProcessedVote[]) => {
+  const fetchProjects = useCallback(async (currentVotes: ProcessedVote[], nextPaymentTime: Date | null) => {
     setLoading(true);
-    const fund = getFundContract();console.log("fetching projects");
+    const fund = getFundContract();
+    console.log("fetching projects");
 
     try {
-      // Fetch active projects
-      const activeResult = await fund.functions.get_projects<{ projects: Project[] }>({
-        status: ProjectStatus.Active,
-        order_by: OrderBy.Votes,
-        limit: pageSize,
-        start: pageStart,
-        descending: true,
-      });
+      const now = new Date();
 
-      const processedActiveProjects = (activeResult?.result?.projects || []).map(project => ({
+      // Fetch active projects - 3 pages
+      const allActiveProjects: Project[] = [];
+      let activeStart = pageStart;
+      const activePagesToFetch = 3;
+
+      for (let page = 0; page < activePagesToFetch; page++) {
+        const activeResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
+          status: ProjectStatus.Active,
+          order_by: OrderBy.Votes,
+          limit: pageSize,
+          start: activeStart,
+          descending: true,
+        });
+
+        const projects = activeResult?.result?.projects || [];
+        allActiveProjects.push(...projects);
+
+        // Use start_next_page for the next iteration, or break if there's no next page
+        const nextPageStart = activeResult?.result?.start_next_page;
+        if (!nextPageStart || projects.length === 0) {
+          break; // No more pages available
+        }
+        activeStart = nextPageStart;
+      }
+
+      const processedActiveProjects = allActiveProjects.map(project => ({
         ...project,
         monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
         start_date: new Date(parseInt(project.start_date)),
@@ -142,30 +163,67 @@ export default function Home() {
         total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
         vote: currentVotes.find(v => v.project_id === project.id),
       }));
+
+      // Fetch upcoming projects - 3 pages
+      const allUpcomingProjects: Project[] = [];
+      let upcomingStart = pageStart;
+      const upcomingPagesToFetch = 3;
+
+      for (let page = 0; page < upcomingPagesToFetch; page++) {
+        const upcomingResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
+          status: ProjectStatus.Upcoming,
+          order_by: OrderBy.Votes,
+          limit: pageSize,
+          start: upcomingStart,
+          descending: true,
+        });
+
+        const projects = upcomingResult?.result?.projects || [];
+        allUpcomingProjects.push(...projects);
+
+        // Use start_next_page for the next iteration, or break if there's no next page
+        const nextPageStart = upcomingResult?.result?.start_next_page;
+        if (!nextPageStart || projects.length === 0) {
+          break; // No more pages available
+        }
+        upcomingStart = nextPageStart;
+      }
+
+      const processedUpcomingProjects = allUpcomingProjects.map(project => ({
+        ...project,
+        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
+        start_date: new Date(parseInt(project.start_date)),
+        end_date: new Date(parseInt(project.end_date)),
+        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
+        vote: currentVotes.find(v => v.project_id === project.id),
+      }));
+
+      // Filter and move projects based on dates
+      // Remove active projects that end before next payment
+      const filteredActiveProjects = processedActiveProjects.filter(project => {
+        if (!nextPaymentTime) return true; // Keep all if no next payment time
+        return project.end_date >= nextPaymentTime;
+      });
+
+      // Move upcoming projects that have started to active list
+      const projectsToMoveToActive = processedUpcomingProjects.filter(project => 
+        project.start_date <= now
+      );
+      const remainingUpcomingProjects = processedUpcomingProjects.filter(project => 
+        project.start_date > now
+      );
+
+      // Combine moved projects with active projects
+      const finalActiveProjects = [...filteredActiveProjects, ...projectsToMoveToActive];
+
+      // Sort active projects by votes (highest first)
+      finalActiveProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
 
       // Calculate payment distribution for active projects
-      const projectsWithPayments = calculatePaymentDistribution(processedActiveProjects, fundBalance || 0);
+      const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
       setActiveProjects(projectsWithPayments);
 
-      // Fetch upcoming projects
-      const upcomingResult = await fund.functions.get_projects<{ projects: Project[] }>({
-        status: ProjectStatus.Upcoming,
-        order_by: OrderBy.Votes,
-        limit: pageSize,
-        start: pageStart,
-        descending: true,
-      });
-
-      const processedUpcomingProjects = (upcomingResult?.result?.projects || []).map(project => ({
-        ...project,
-        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(project.start_date)),
-        end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: currentVotes.find(v => v.project_id === project.id),
-      }));
-
-      setUpcomingProjects(processedUpcomingProjects);
+      setUpcomingProjects(remainingUpcomingProjects);
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
@@ -176,8 +234,8 @@ export default function Home() {
 
   const fetchData = useCallback(async () => {
     const currentVotes = await fetchVotes();
-    await fetchFundData(); // Fetch fund balance first
-    await fetchProjects(currentVotes); // Then calculate payments with the balance
+    const nextPaymentTime = await fetchFundData(); // Fetch fund balance first
+    await fetchProjects(currentVotes, nextPaymentTime); // Then calculate payments with the balance
   }, [fetchVotes, fetchProjects, fetchFundData]);
 
   useEffect(() => {
@@ -281,9 +339,11 @@ export default function Home() {
 
                   {/* Project Header */}
                   <div className="mb-4">
-                    <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                      {project.title}
-                    </h3>
+                    <Link href={`/projects/${project.id}`}>
+                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                        {project.title}
+                      </h3>
+                    </Link>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -397,9 +457,11 @@ export default function Home() {
 
                   {/* Project Header */}
                   <div className="mb-4">
-                    <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                      {project.title}
-                    </h3>
+                    <Link href={`/projects/${project.id}`}>
+                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                        {project.title}
+                      </h3>
+                    </Link>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>

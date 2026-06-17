@@ -6,7 +6,7 @@ import { FloatingInput, FloatingTextarea } from '@/components/ui/floating-input'
 import { DatePicker } from '@/components/ui/date-picker';
 import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
-import { getFundContract } from '@/lib/utils';
+import { getFundContract, getKoinContract } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { ProviderInterface, SignerInterface } from 'koilib';
 import { useRouter } from 'next/navigation';
@@ -182,10 +182,11 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
       const provider = getKondorProvider() as ProviderInterface;
       const signer = await getKondorSigner() as SignerInterface;
       const fund = getFundContract(provider, signer);
+      const koin = getKoinContract(provider, signer);
 
       // Convert monthly payment to the correct format (multiply by 1e8)
       const monthlyPaymentInKoin = parseFloat(formData.monthly_payment);
-      const monthlyPaymentInSmallestUnit = Math.floor(monthlyPaymentInKoin * 1e8);
+      const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
       const startTimestamp = new Date(formData.start_date).getTime();
@@ -193,7 +194,14 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
       // Convert calculated fee to smallest unit
       const feeInKoin = parseFloat(calculatedFee);
-      const feeInSmallestUnit = Math.floor(feeInKoin * 1e8);
+      const feeInSmallestUnit = Math.ceil(feeInKoin * 1e8);
+
+      // Approve transfer
+      const { operation: approveOperation } = await koin.functions.approve({
+        owner: signer.getAddress(),
+        spender: fund.getId(),
+        value: feeInSmallestUnit.toString(),
+      }, { onlyOperation: true });
 
       const { transaction, receipt } = await fund.functions.submit_project({
         creator: signer.getAddress(),
@@ -204,7 +212,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
         start_date: startTimestamp.toString(),
         end_date: endTimestamp.toString(),
         fee: feeInSmallestUnit.toString(),
-      });
+      }, { previousOperations: [approveOperation] });
 
       console.log('project submission result:', { transaction, receipt });
 
