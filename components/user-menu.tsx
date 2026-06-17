@@ -77,7 +77,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         
         <DropdownMenuItem 
-          onClick={() => window.open('https://www.koinscan.io/address/' + address, '_blank')} 
+          onClick={() => window.open('https://www.koinscan.com/address/' + address, '_blank')} 
           className="cursor-pointer"
         >
           <Wallet className="w-4 h-4 mr-3" />
