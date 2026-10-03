@@ -8,6 +8,7 @@ import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract, getKoinContract } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { MAX_PROJECT_DESCRIPTION_LENGTH } from '@/lib/project-limits';
 import { ProviderInterface, SignerInterface } from 'koilib';
 import { useRouter } from 'next/navigation';
 
@@ -104,6 +105,8 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
+    } else if (formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH) {
+      newErrors.description = `Description must be ${MAX_PROJECT_DESCRIPTION_LENGTH} characters or fewer`;
     }
 
     if (!formData.monthly_payment.trim()) {
@@ -284,11 +287,16 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
         <div className="space-y-2">
           <FloatingTextarea
             label="Project Description"
+            maxLength={MAX_PROJECT_DESCRIPTION_LENGTH}
+            aria-describedby="description-character-count"
             value={formData.description}
             onChange={(e) => handleInputChange('description', e.target.value)}
             error={errors.description}
             rows={5}
           />
+          <p id="description-character-count" className="text-sm text-muted-foreground text-right">
+            {formData.description.length}/{MAX_PROJECT_DESCRIPTION_LENGTH} characters
+          </p>
         </div>
 
                 {/* Monthly Payment */}
@@ -387,7 +395,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee}
+            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee || formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH}
             className="flex-1 h-14 text-base rounded-xl bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             {isLoading ? (

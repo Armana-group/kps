@@ -15,6 +15,7 @@ import { Plus, Loader2, AlertCircle, Calculator } from 'lucide-react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { MAX_PROJECT_DESCRIPTION_LENGTH } from '@/lib/project-limits';
 import { ProviderInterface, SignerInterface } from 'koilib';
 
 interface SubmitProjectModalProps {
@@ -114,6 +115,8 @@ export function SubmitProjectModal({
 
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
+    } else if (formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH) {
+      newErrors.description = `Description must be ${MAX_PROJECT_DESCRIPTION_LENGTH} characters or fewer`;
     }
 
     if (!formData.monthly_payment.trim()) {
@@ -275,6 +278,8 @@ export function SubmitProjectModal({
             </label>
             <textarea
               id="description"
+              maxLength={MAX_PROJECT_DESCRIPTION_LENGTH}
+              aria-describedby="modal-description-character-count"
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="Describe your project in detail..."
@@ -285,6 +290,9 @@ export function SubmitProjectModal({
                   : 'border-input focus-visible:border-ring focus-visible:ring-ring/50'
               } focus-visible:outline-none focus-visible:ring-[3px]`}
             />
+            <p id="modal-description-character-count" className="text-sm text-muted-foreground text-right">
+              {formData.description.length}/{MAX_PROJECT_DESCRIPTION_LENGTH} characters
+            </p>
             {errors.description && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="w-4 h-4" />
@@ -417,7 +425,7 @@ export function SubmitProjectModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee}
+            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee || formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH}
             className="flex-1"
           >
             {isLoading ? (
