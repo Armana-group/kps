@@ -332,7 +332,9 @@ export default function Home() {
               {activeProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
+                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getInvalidProposal(project.id)
+                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
+                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
                 >
                   {/* Project ID Badge */}
                   <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
@@ -342,7 +344,7 @@ export default function Home() {
                   {/* Project Header */}
                   <div className="mb-4">
                     <Link href={`/projects/${project.id}`}>
-                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getInvalidProposal(project.id) ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
                         {project.title}
                       </h3>
                     </Link>
@@ -448,7 +450,9 @@ export default function Home() {
               {upcomingProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
+                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getInvalidProposal(project.id)
+                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
+                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
                 >
                   {/* Project ID Badge */}
                   <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
@@ -458,7 +462,7 @@ export default function Home() {
                   {/* Project Header */}
                   <div className="mb-4">
                     <Link href={`/projects/${project.id}`}>
-                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getInvalidProposal(project.id) ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
                         {project.title}
                       </h3>
                     </Link>
@@ -520,7 +524,7 @@ export default function Home() {
 function ProposalCardDescription({ id, description }: { id: number; description: string }) {
   if (getInvalidProposal(id)) {
     return (
-      <div role="note" aria-label="Invalid proposal notice" className="mb-6 h-[4.25rem] rounded-lg border border-red-500/50 bg-red-50 px-3 py-2 text-red-900 dark:bg-red-950/40 dark:text-red-200">
+      <div role="note" aria-label="Invalid proposal notice" className="mb-6 h-[4.25rem] rounded-lg border border-red-500/70 bg-red-50 px-3 py-2 text-red-900 dark:bg-red-950/60 dark:text-red-200">
         <p className="text-xs leading-4">
           <strong>Invalid proposal.</strong> The author asks you to remove your vote.
         </p>
