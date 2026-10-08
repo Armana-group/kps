@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { getProposalNotice, isProposalHidden } from "@/lib/proposal-visibility";
+import { ProposalNotice } from "@/components/proposal-notice";
 import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -221,9 +223,10 @@ export default function Home() {
 
       // Calculate payment distribution for active projects
       const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
-      setActiveProjects(projectsWithPayments);
+      // Hide cards after allocation: hidden proposals still compete for funds on-chain.
+      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id, project.votes)));
 
-      setUpcomingProjects(remainingUpcomingProjects);
+      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id, project.votes)));
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
@@ -330,7 +333,9 @@ export default function Home() {
               {activeProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
+                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getProposalNotice(project.id)?.muted
+                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
+                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
                 >
                   {/* Project ID Badge */}
                   <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
@@ -340,7 +345,7 @@ export default function Home() {
                   {/* Project Header */}
                   <div className="mb-4">
                     <Link href={`/projects/${project.id}`}>
-                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getProposalNotice(project.id)?.muted ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
                         {project.title}
                       </h3>
                     </Link>
@@ -354,9 +359,7 @@ export default function Home() {
                   </div>
 
                   {/* Project Description */}
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">
-                    {project.description}
-                  </p>
+                  <ProposalCardDescription id={project.id} description={project.description} />
 
                   {/* Project Details */}
                   <div className="space-y-3 text-sm mb-6">
@@ -448,7 +451,9 @@ export default function Home() {
               {upcomingProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="group relative bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 hover:-translate-y-1"
+                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getProposalNotice(project.id)?.muted
+                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
+                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
                 >
                   {/* Project ID Badge */}
                   <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
@@ -458,7 +463,7 @@ export default function Home() {
                   {/* Project Header */}
                   <div className="mb-4">
                     <Link href={`/projects/${project.id}`}>
-                      <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors line-clamp-2 cursor-pointer">
+                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getProposalNotice(project.id)?.muted ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
                         {project.title}
                       </h3>
                     </Link>
@@ -472,9 +477,7 @@ export default function Home() {
                   </div>
 
                   {/* Project Description */}
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">
-                    {project.description}
-                  </p>
+                  <ProposalCardDescription id={project.id} description={project.description} />
 
                   {/* Project Details */}
                   <div className="space-y-3 text-sm">
@@ -517,4 +520,10 @@ export default function Home() {
 
     </div>
   );
+}
+
+function ProposalCardDescription({ id, description }: { id: number; description: string }) {
+  const config = getProposalNotice(id);
+  if (config) return <ProposalNotice notice={config.notice} variant="compact" />;
+  return <p className="h-[4.25rem] text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">{description}</p>;
 }

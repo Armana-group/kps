@@ -6,6 +6,8 @@ import { getFundContract, ProjectStatus, Project, ProcessedVote, Vote } from "@/
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
+import { ProposalNotice } from "@/components/proposal-notice";
+import { getProposalNotice } from "@/lib/proposal-visibility";
 
 interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
   monthly_payment: string;
@@ -158,6 +160,8 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const proposalNotice = getProposalNotice(project.id);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Back Button */}
@@ -176,6 +180,8 @@ export default function ProjectDetailPage() {
       {/* Project Header */}
       <section className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
+          {proposalNotice && <ProposalNotice notice={proposalNotice.notice} />}
+
           {/* Title and Status */}
           <div className="mb-6">
             <div className="flex items-start justify-between gap-4 mb-4">
