@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
+import { getProjectDateTimestamps } from '@/lib/payment-schedule';
 import { FloatingInput, FloatingTextarea } from '@/components/ui/floating-input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract, getKoinContract } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { MAX_PROJECT_DESCRIPTION_LENGTH } from '@/lib/project-limits';
 import { ProviderInterface, SignerInterface } from 'koilib';
 import { useRouter } from 'next/navigation';
 
@@ -47,15 +50,16 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
   const router = useRouter();
 
   const calculateFee = useCallback(async () => {
-    if (!formData.start_date || !formData.end_date) {
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
       setCalculatedFee('');
       return;
     }
 
     setIsCalculatingFee(true);
     try {
-      const provider = getKondorProvider() as ProviderInterface;
-      const fund = getFundContract(provider);
+      // Fee and payment previews are read-only and available before wallet connection.
+      const fund = getFundContract();
 
       // Get global vars from the fund contract
       const { result: globalVars } = await fund.functions.get_global_vars<GlobalVars>();
@@ -66,8 +70,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
       // Calculate fee using the formula: p * p * p * (end_date - start_date) / fee_denominator
       const p = (globalVars.total_active_projects || 0) + (globalVars.total_upcoming_projects || 0) + 1;
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       const feeNumerator = p * p * p * (endTimestamp - startTimestamp);
       const feeDenominator = parseInt(globalVars.fee_denominator);
@@ -82,7 +85,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
     } finally {
       setIsCalculatingFee(false);
     }
-  }, [formData.start_date, formData.end_date, getKondorProvider]);
+  }, [formData.start_date, formData.end_date]);
 
   // Calculate fee when form data changes
   useEffect(() => {
@@ -104,6 +107,8 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
+    } else if (formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH) {
+      newErrors.description = `Description must be ${MAX_PROJECT_DESCRIPTION_LENGTH} characters or fewer`;
     }
 
     if (!formData.monthly_payment.trim()) {
@@ -170,6 +175,12 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
       return;
     }
 
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
+      toast.error('Please choose valid start and end dates');
+      return;
+    }
+
     if (!calculatedFee) {
       toast.error('Please wait for fee calculation to complete');
       return;
@@ -189,8 +200,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
       const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       // Convert calculated fee to smallest unit
       const feeInKoin = parseFloat(calculatedFee);
@@ -284,11 +294,16 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
         <div className="space-y-2">
           <FloatingTextarea
             label="Project Description"
+            maxLength={MAX_PROJECT_DESCRIPTION_LENGTH}
+            aria-describedby="description-character-count"
             value={formData.description}
             onChange={(e) => handleInputChange('description', e.target.value)}
             error={errors.description}
             rows={5}
           />
+          <p id="description-character-count" className="text-sm text-muted-foreground text-right">
+            {formData.description.length}/{MAX_PROJECT_DESCRIPTION_LENGTH} characters
+          </p>
         </div>
 
                 {/* Monthly Payment */}
@@ -342,6 +357,13 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
           </div>
         </div>
 
+        <PaymentSchedulePreview
+          startDate={formData.start_date}
+          endDate={formData.end_date}
+          monthlyPayment={formData.monthly_payment}
+          onEndDateChange={(value) => handleInputChange('end_date', value)}
+        />
+
         {/* Fee Information */}
         <div className="bg-muted/30 rounded-2xl p-6 border border-border/50">
           <div className="flex items-center gap-3 mb-4">
@@ -387,7 +409,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee}
+            disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee || formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH}
             className="flex-1 h-14 text-base rounded-xl bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             {isLoading ? (
