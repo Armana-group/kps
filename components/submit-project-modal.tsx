@@ -364,7 +364,6 @@ export function SubmitProjectModal({
                 onChange={(e) => handleInputChange('start_date', e.target.value)}
                 className={errors.start_date ? 'border-red-500' : ''}
               />
-              <p className="text-xs text-muted-foreground">Starts at 00:00 UTC</p>
               {errors.start_date && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
@@ -384,7 +383,6 @@ export function SubmitProjectModal({
                 onChange={(e) => handleInputChange('end_date', e.target.value)}
                 className={errors.end_date ? 'border-red-500' : ''}
               />
-              <p className="text-xs text-muted-foreground">Ends at 13:00 UTC on this date</p>
               {errors.end_date && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />

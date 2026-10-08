@@ -344,7 +344,6 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
               onChange={(value) => handleInputChange('start_date', value)}
               error={errors.start_date}
             />
-            <p className="text-xs text-muted-foreground">Starts at 00:00 UTC</p>
           </div>
 
           <div className="space-y-2">
@@ -355,7 +354,6 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
               error={errors.end_date}
               minDate={formData.start_date}
             />
-            <p className="text-xs text-muted-foreground">Ends at 13:00 UTC on this date</p>
           </div>
         </div>
 
