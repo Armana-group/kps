@@ -53,3 +53,18 @@ The rules follow [`Fund.ts`](https://github.com/koinos/koinos-contracts-as/blob/
 For ranges longer than six payment dates, the preview shows the first two and last two dates, with the full count and requested total. Users can expand all dates in a scrollable table; changing the date range restores the compact view.
 
 Run the payment-schedule regression tests with `npm test`. They use the existing TypeScript compiler and Node's built-in test runner, with no additional test dependencies.
+
+## Hidden proposals and author notices
+
+Edit `config/hidden-proposals.json` to maintain author-requested invalid proposals. Each entry has a numeric `id` and a public `reason`, for example:
+
+```json
+[
+  { "id": 8, "reason": "This proposal was created incorrectly." },
+  { "id": 9, "reason": "This proposal was created incorrectly." }
+]
+```
+
+Listed proposals are hidden from both active and upcoming cards on the home page. Their direct `/projects/<id>` pages remain accessible and display a red author notice asking voters to remove their votes (set the vote to 0%). Unlisted proposals have no notice. Remove an entry to restore the home-page card and clear the notice; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
+
+These are frontend notices recorded at the author's request, not an on-chain invalid status or an automatic vote removal. Hidden proposals still participate in the fund's payment allocation, so the home page calculates payment estimates before hiding their cards. Only add an author notice after confirming the author's request. Proposals 8 and 9 are included at their author's request.

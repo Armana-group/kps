@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { isProposalHidden } from "@/lib/proposal-visibility";
 import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -221,9 +222,10 @@ export default function Home() {
 
       // Calculate payment distribution for active projects
       const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
-      setActiveProjects(projectsWithPayments);
+      // Hide cards after allocation: hidden proposals still compete for funds on-chain.
+      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id)));
 
-      setUpcomingProjects(remainingUpcomingProjects);
+      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id)));
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
