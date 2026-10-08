@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
 import { FloatingInput, FloatingTextarea } from '@/components/ui/floating-input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
@@ -55,8 +56,8 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
     setIsCalculatingFee(true);
     try {
-      const provider = getKondorProvider() as ProviderInterface;
-      const fund = getFundContract(provider);
+      // Fee and payment previews are read-only and available before wallet connection.
+      const fund = getFundContract();
 
       // Get global vars from the fund contract
       const { result: globalVars } = await fund.functions.get_global_vars<GlobalVars>();
@@ -83,7 +84,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
     } finally {
       setIsCalculatingFee(false);
     }
-  }, [formData.start_date, formData.end_date, getKondorProvider]);
+  }, [formData.start_date, formData.end_date]);
 
   // Calculate fee when form data changes
   useEffect(() => {
@@ -349,6 +350,13 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
             />
           </div>
         </div>
+
+        <PaymentSchedulePreview
+          startDate={formData.start_date}
+          endDate={formData.end_date}
+          monthlyPayment={formData.monthly_payment}
+          onEndDateChange={(value) => handleInputChange('end_date', value)}
+        />
 
         {/* Fee Information */}
         <div className="bg-muted/30 rounded-2xl p-6 border border-border/50">

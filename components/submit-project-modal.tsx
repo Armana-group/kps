@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -67,8 +68,8 @@ export function SubmitProjectModal({
 
     setIsCalculatingFee(true);
     try {
-      const provider = getKondorProvider() as ProviderInterface;
-      const fund = getFundContract(provider);
+      // Fee and payment previews are read-only and available before wallet connection.
+      const fund = getFundContract();
 
       // Get global vars from the fund contract
       const { result: globalVars } = await fund.functions.get_global_vars<GlobalVars>();
@@ -95,7 +96,7 @@ export function SubmitProjectModal({
     } finally {
       setIsCalculatingFee(false);
     }
-  }, [formData.start_date, formData.end_date, getKondorProvider]);
+  }, [formData.start_date, formData.end_date]);
 
   // Calculate fee when form data changes
   useEffect(() => {
@@ -179,7 +180,7 @@ export function SubmitProjectModal({
 
       // Convert monthly payment to the correct format (multiply by 1e8)
       const monthlyPaymentInKoin = parseFloat(formData.monthly_payment);
-      const monthlyPaymentInSmallestUnit = Math.floor(monthlyPaymentInKoin * 1e8);
+      const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
       const startTimestamp = new Date(formData.start_date).getTime();
@@ -384,6 +385,13 @@ export function SubmitProjectModal({
               )}
             </div>
           </div>
+
+          <PaymentSchedulePreview
+            startDate={formData.start_date}
+            endDate={formData.end_date}
+            monthlyPayment={formData.monthly_payment}
+            onEndDateChange={(value) => handleInputChange('end_date', value)}
+          />
 
           {/* Fee Information */}
           <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
