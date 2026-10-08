@@ -39,15 +39,17 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 The submission page and modal preview payment eligibility as soon as valid dates are entered, without connecting a wallet. The preview reads `payment_times` from the public mainnet fund contract. Later month-end dates are marked as projections beyond the contract's six registered payment events.
 
-Form dates are submitted at **00:00 UTC**. The start date is inclusive and the end date is exclusive. The proposal must still be active when the payout is processed. For a request of 34,000 KOIN/month starting 1 November 2026:
+The start date is submitted at **00:00 UTC** and the end date at **13:00 UTC on the selected final day**, one hour after the usual month-end noon payment. The start timestamp is inclusive and the end timestamp is exclusive. The same UTC conversion is used for the fee, preview, and submitted transaction. The proposal must still be active when the payout is processed. For a request of 34,000 KOIN/month starting 1 November 2026:
 
 | End date | Eligible scheduled payments | Maximum requested total |
 | --- | --- | ---: |
-| 31 January 2027 | 30 November and 31 December | 68,000 KOIN |
-| 1 February 2027 | 30 November, 31 December, and 31 January | 102,000 KOIN |
+| 30 January 2027 | 30 November and 31 December | 68,000 KOIN |
+| 31 January 2027 | 30 November, 31 December, and 31 January | 102,000 KOIN |
 
-The UI warns when a month-end end date excludes that day's noon payment and offers the following day as an explicit correction. It does not change dates automatically. These amounts are eligibility estimates: votes, ranking, available budget, and the actual processing block determine whether payment is full, partial, or zero. Payments are not prorated by days.
+The date picker keeps the selected date (for example, 31 January); helper text and the preview disclose its 13:00 UTC end time. A proposal from 1 to 30 November includes one scheduled payment. If a registered payment is at or after the final day's 13:00 cutoff, the UI warns and offers the following day as an explicit correction. This conversion applies to new submissions; existing on-chain proposals retain their original timestamps. These amounts are eligibility estimates: votes, ranking, available budget, and the actual processing block determine whether payment is full, partial, or zero. Payments are not prorated by days.
 
 The rules follow [`Fund.ts`](https://github.com/koinos/koinos-contracts-as/blob/b200169debb7c9b51de68c8a8129e39aed91398d/contracts/fund/assembly/Fund.ts): mainnet payments are scheduled at month-end noon UTC, and expired projects are removed before payment selection. If the public schedule cannot be loaded, the preview shows an error and a retry button rather than inventing dates.
+
+For ranges longer than six payment dates, the preview shows the first two and last two dates, with the full count and requested total. Users can expand all dates in a scrollable table; changing the date range restores the compact view.
 
 Run the payment-schedule regression tests with `npm test`. They use the existing TypeScript compiler and Node's built-in test runner, with no additional test dependencies.

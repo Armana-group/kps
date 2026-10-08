@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
+import { getProjectDateTimestamps } from '@/lib/payment-schedule';
 import { FloatingInput, FloatingTextarea } from '@/components/ui/floating-input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
@@ -49,7 +50,8 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
   const router = useRouter();
 
   const calculateFee = useCallback(async () => {
-    if (!formData.start_date || !formData.end_date) {
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
       setCalculatedFee('');
       return;
     }
@@ -68,8 +70,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
 
       // Calculate fee using the formula: p * p * p * (end_date - start_date) / fee_denominator
       const p = (globalVars.total_active_projects || 0) + (globalVars.total_upcoming_projects || 0) + 1;
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       const feeNumerator = p * p * p * (endTimestamp - startTimestamp);
       const feeDenominator = parseInt(globalVars.fee_denominator);
@@ -174,6 +175,12 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
       return;
     }
 
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
+      toast.error('Please choose valid start and end dates');
+      return;
+    }
+
     if (!calculatedFee) {
       toast.error('Please wait for fee calculation to complete');
       return;
@@ -193,8 +200,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
       const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       // Convert calculated fee to smallest unit
       const feeInKoin = parseFloat(calculatedFee);
@@ -338,6 +344,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
               onChange={(value) => handleInputChange('start_date', value)}
               error={errors.start_date}
             />
+            <p className="text-xs text-muted-foreground">Starts at 00:00 UTC</p>
           </div>
 
           <div className="space-y-2">
@@ -348,6 +355,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
               error={errors.end_date}
               minDate={formData.start_date}
             />
+            <p className="text-xs text-muted-foreground">Ends at 13:00 UTC on this date</p>
           </div>
         </div>
 

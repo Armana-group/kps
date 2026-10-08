@@ -12,16 +12,26 @@ export function parseUtcDate(value: string): number | null {
   return timestamp;
 }
 
+export const PROJECT_END_HOUR_UTC = 13;
+
+/** The selected final day includes the usual 12:00 UTC payout, with a one-hour margin. */
+export function getProjectDateTimestamps(startDate: string, endDate: string): { start: number; end: number } | null {
+  const start = parseUtcDate(startDate);
+  const finalDay = parseUtcDate(endDate);
+  if (start === null || finalDay === null || finalDay <= start) return null;
+  return { start, end: finalDay + PROJECT_END_HOUR_UTC * 60 * 60 * 1000 };
+}
+
 function monthEndPayment(timestamp: number): number {
   const date = new Date(timestamp);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1) - 12 * 60 * 60 * 1000;
 }
 
-/** Mainnet: start <= payment time < end. All form dates are midnight UTC. */
+/** Mainnet: start <= payment time < end. Start is 00:00 UTC; end is 13:00 UTC. */
 export function buildPaymentSchedule(startDate: string, endDate: string, paymentTimes: string[]): PaymentSlot[] {
-  const start = parseUtcDate(startDate);
-  const end = parseUtcDate(endDate);
-  if (start === null || end === null || end <= start) return [];
+  const timestamps = getProjectDateTimestamps(startDate, endDate);
+  if (!timestamps) return [];
+  const { start, end } = timestamps;
 
   const times = paymentTimes.map(Number);
   if (!times.length || times.some((time, index) => !Number.isSafeInteger(time) || time <= 0 ||

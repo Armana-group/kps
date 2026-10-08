@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
+import { getProjectDateTimestamps } from '@/lib/payment-schedule';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -61,7 +62,8 @@ export function SubmitProjectModal({
   const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
 
   const calculateFee = useCallback(async () => {
-    if (!formData.start_date || !formData.end_date) {
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
       setCalculatedFee('');
       return;
     }
@@ -80,8 +82,7 @@ export function SubmitProjectModal({
 
       // Calculate fee using the formula: p * p * p * (end_date - start_date) / fee_denominator
       const p = (globalVars.total_active_projects || 0) + (globalVars.total_upcoming_projects || 0) + 1;
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       const feeNumerator = p * p * p * (endTimestamp - startTimestamp);
       const feeDenominator = parseInt(globalVars.fee_denominator);
@@ -167,6 +168,12 @@ export function SubmitProjectModal({
       return;
     }
 
+    const timestamps = getProjectDateTimestamps(formData.start_date, formData.end_date);
+    if (!timestamps) {
+      toast.error('Please choose valid start and end dates');
+      return;
+    }
+
     if (!calculatedFee) {
       toast.error('Please wait for fee calculation to complete');
       return;
@@ -183,8 +190,7 @@ export function SubmitProjectModal({
       const monthlyPaymentInSmallestUnit = Math.ceil(monthlyPaymentInKoin * 1e8);
 
       // Convert dates to timestamps
-      const startTimestamp = new Date(formData.start_date).getTime();
-      const endTimestamp = new Date(formData.end_date).getTime();
+      const { start: startTimestamp, end: endTimestamp } = timestamps;
 
       // Convert calculated fee to smallest unit
       const feeInKoin = parseFloat(calculatedFee);
@@ -358,6 +364,7 @@ export function SubmitProjectModal({
                 onChange={(e) => handleInputChange('start_date', e.target.value)}
                 className={errors.start_date ? 'border-red-500' : ''}
               />
+              <p className="text-xs text-muted-foreground">Starts at 00:00 UTC</p>
               {errors.start_date && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
@@ -377,6 +384,7 @@ export function SubmitProjectModal({
                 onChange={(e) => handleInputChange('end_date', e.target.value)}
                 className={errors.end_date ? 'border-red-500' : ''}
               />
+              <p className="text-xs text-muted-foreground">Ends at 13:00 UTC on this date</p>
               {errors.end_date && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />

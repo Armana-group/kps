@@ -6,7 +6,7 @@ import ts from 'typescript';
 // Use the project's TypeScript compiler so tests also run on Next.js-supported Node 18/20.
 const source = readFileSync(new URL('../lib/payment-schedule.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
-const { buildPaymentSchedule, parseUtcDate, endDateAfterPayment, requestedPaymentUnits, formatKoinUnits } =
+const { buildPaymentSchedule, parseUtcDate, getProjectDateTimestamps, endDateAfterPayment, requestedPaymentUnits, formatKoinUnits } =
   await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 const times = [
@@ -16,23 +16,45 @@ const times = [
 const eligible = (start, end, schedule = times) => buildPaymentSchedule(start, end, schedule)
   .filter(slot => slot.eligible).map(slot => new Date(slot.timestamp).toISOString());
 
-test('regression: 31 January end excludes January noon payment; 1 February includes it', () => {
+test('regression: 31 January at 13:00 UTC includes January noon payment without changing the date', () => {
   assert.deepEqual(eligible('2026-11-01', '2027-01-31'), [
-    '2026-11-30T12:00:00.000Z', '2026-12-31T12:00:00.000Z',
+    '2026-11-30T12:00:00.000Z', '2026-12-31T12:00:00.000Z', '2027-01-31T12:00:00.000Z',
   ]);
-  const excluded = buildPaymentSchedule('2026-11-01', '2027-01-31', times).at(-1);
-  assert.equal(excluded.reason, 'ended');
-  assert.equal(endDateAfterPayment(excluded.timestamp), '2027-02-01');
-  assert.equal(eligible('2026-11-01', '2027-02-01').length, 3);
+  const finalPayment = buildPaymentSchedule('2026-11-01', '2027-01-31', times).at(-1);
+  assert.equal(finalPayment.eligible, true);
+  assert.equal(eligible('2026-11-01', '2027-01-30').length, 2);
+});
+
+test('one full calendar month includes its final noon payment', () => {
+  assert.deepEqual(eligible('2026-11-01', '2026-11-30'), ['2026-11-30T12:00:00.000Z']);
+  assert.deepEqual(eligible('2027-12-01', '2028-02-29'), [
+    '2027-12-31T12:00:00.000Z', '2028-01-31T12:00:00.000Z', '2028-02-29T12:00:00.000Z',
+  ]);
+});
+
+test('shared timestamps for fee, preview, and submission are explicit UTC hours', () => {
+  for (const [start, end] of [['2026-11-01', '2027-01-31'], ['2027-03-01', '2027-03-31'], ['2027-10-01', '2027-10-31']]) {
+    const timestamps = getProjectDateTimestamps(start, end);
+    assert.equal(new Date(timestamps.start).toISOString(), `${start}T00:00:00.000Z`);
+    assert.equal(new Date(timestamps.end).toISOString(), `${end}T13:00:00.000Z`);
+    assert.equal(timestamps.end - Date.parse(`${end}T00:00:00Z`), 13 * 60 * 60 * 1000);
+  }
+  assert.equal(getProjectDateTimestamps('2027-02-29', '2027-03-31'), null);
 });
 
 test('start date is inclusive: starting on payment day at midnight includes noon', () => {
   assert.deepEqual(eligible('2027-01-31', '2027-02-01'), ['2027-01-31T12:00:00.000Z']);
 });
 
-test('exact start timestamp is included and exact end timestamp is excluded', () => {
-  const midnightTimes = ['2027-01-01T00:00:00Z', '2027-02-01T00:00:00Z'].map(time => String(Date.parse(time)));
-  assert.deepEqual(eligible('2027-01-01', '2027-02-01', midnightTimes), ['2027-01-01T00:00:00.000Z']);
+test('exact start timestamp is included and exact 13:00 end timestamp is excluded', () => {
+  const boundaryTimes = ['2027-01-01T00:00:00Z', '2027-02-01T12:59:59.999Z', '2027-02-01T13:00:00Z', '2027-02-01T13:00:00.001Z']
+    .map(time => String(Date.parse(time)));
+  assert.deepEqual(eligible('2027-01-01', '2027-02-01', boundaryTimes), [
+    '2027-01-01T00:00:00.000Z', '2027-02-01T12:59:59.999Z',
+  ]);
+  const excluded = buildPaymentSchedule('2027-01-01', '2027-02-01', boundaryTimes).at(-1);
+  assert.equal(excluded.reason, 'ended');
+  assert.equal(endDateAfterPayment(excluded.timestamp), '2027-02-02');
 });
 
 test('mid-month end and reversed/empty ranges contain no eligible payments', () => {
