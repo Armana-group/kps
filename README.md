@@ -54,17 +54,29 @@ For ranges longer than six payment dates, the preview shows the first two and la
 
 Run the payment-schedule regression tests with `npm test`. They use the existing TypeScript compiler and Node's built-in test runner, with no additional test dependencies.
 
-## Hidden proposals and author notices
+## Configurable proposal notices
 
-Edit `config/hidden-proposals.json` to maintain author-requested invalid proposals. Each entry has a numeric `id` and a public `reason`, for example:
+Edit `config/proposal-notices.json` to maintain public notices and control card visibility independently of their wording. For example:
 
 ```json
 [
-  { "id": 8, "reason": "This proposal was created incorrectly." },
-  { "id": 9, "reason": "This proposal was created incorrectly." }
+  {
+    "id": 9,
+    "hideWhenNoVotes": true,
+    "muted": true,
+    "notice": {
+      "title": "Invalid proposal",
+      "summary": "The author asks voters to remove their votes.",
+      "details": "This proposal was created incorrectly. Please connect your wallet and set your vote to 0%."
+    }
+  }
 ]
 ```
 
-Listed proposals with no remaining votes are hidden from both active and upcoming cards on the home page. Those with any remaining raw vote units stay visible with a compact red author notice replacing the card description in the same fixed-height space. Visible invalid cards use muted text and a translucent background, while their red notice stays fully visible. Their direct `/projects/<id>` pages remain accessible and display a red author notice asking voters to remove their votes (set the vote to 0%). Unlisted proposals have no notice. Remove an entry to restore the home-page card and clear the notice; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
+`id` is the numeric on-chain proposal ID. `hideWhenNoVotes` hides the card only when no raw vote units remain; set it to `false` to keep the card visible even with no votes. `muted` controls the gray text and translucent card background independently; set it to `false` for ordinary card styling. These options apply to both active and upcoming homepage cards.
 
-These are frontend notices recorded at the author's request, not an on-chain invalid status or an automatic vote removal. Hidden proposals still participate in the fund's payment allocation, so the home page calculates payment estimates before hiding their cards. Only add an author notice after confirming the author's request. Proposals 8 and 9 are included at their author's request.
+Both views use the shared `ProposalNotice` component. The homepage banner displays `notice.title` and `notice.summary` in the same fixed-height space as the description, keeping the red notice fully visible. Keep the title and summary brief: long text is clamped to three lines, with the complete compact text available in the title tooltip. The detail page shows the configured title and full `notice.details`, falling back to `summary` if details are missing or blank. All notice wording, including any vote-removal instructions, comes from the JSON; the frontend does not impose invalidity or author-withdrawal language.
+
+Direct `/projects/<id>` pages remain accessible even when their cards are hidden. Unlisted proposals have no notice or muted styling. Remove an entry to clear its notice and restore ordinary visibility; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
+
+These are frontend notices, not an on-chain status or automatic vote removal. Listed proposals still participate in the fund's payment allocation, so the home page calculates payment estimates before hiding cards. Confirm the author's request before publishing an author-attributed notice. Proposals 8 and 9 are included at their author's request.

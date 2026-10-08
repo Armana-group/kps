@@ -6,8 +6,8 @@ import { getFundContract, ProjectStatus, Project, ProcessedVote, Vote } from "@/
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
-import { getInvalidProposal } from "@/lib/proposal-visibility";
+import { ProposalNotice } from "@/components/proposal-notice";
+import { getProposalNotice } from "@/lib/proposal-visibility";
 
 interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
   monthly_payment: string;
@@ -160,7 +160,7 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const invalidProposal = getInvalidProposal(project.id);
+  const proposalNotice = getProposalNotice(project.id);
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,16 +180,7 @@ export default function ProjectDetailPage() {
       {/* Project Header */}
       <section className="max-w-4xl mx-auto px-6 py-8">
         <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
-          {invalidProposal && (
-            <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/50 bg-red-50 p-4 text-red-900 dark:bg-red-950/40 dark:text-red-200">
-              <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
-              <div className="space-y-2">
-                <h2 className="font-semibold">Proposal marked invalid by its author</h2>
-                <p className="text-sm">{invalidProposal.reason} The author asks voters to remove their votes from this proposal.</p>
-                <p className="text-sm">If you voted, connect your wallet and set your vote to 0% using the voting controls below.</p>
-              </div>
-            </div>
-          )}
+          {proposalNotice && <ProposalNotice notice={proposalNotice.notice} />}
 
           {/* Title and Status */}
           <div className="mb-6">

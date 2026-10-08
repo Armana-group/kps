@@ -1,0 +1,22 @@
+[
+  {
+    "id": 8,
+    "hideWhenNoVotes": true,
+    "muted": true,
+    "notice": {
+      "title": "Invalid proposal",
+      "summary": "This proposal was created incorrectly. The author asks voters to remove their votes.",
+      "details": "This proposal was created incorrectly. The author asks voters to remove their votes. If you voted, connect your wallet and set your vote to 0% using the voting controls below."
+    }
+  },
+  {
+    "id": 9,
+    "hideWhenNoVotes": true,
+    "muted": true,
+    "notice": {
+      "title": "Invalid proposal",
+      "summary": "This proposal was created incorrectly. The author asks voters to remove their votes.",
+      "details": "This proposal was created incorrectly. The author asks voters to remove their votes. If you voted, connect your wallet and set your vote to 0% using the voting controls below."
+    }
+  }
+]
