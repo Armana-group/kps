@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { isProposalHidden } from "@/lib/proposal-visibility";
+import { getInvalidProposal, isProposalHidden } from "@/lib/proposal-visibility";
 import { VoteButton } from "@/components/vote-button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
@@ -223,9 +223,9 @@ export default function Home() {
       // Calculate payment distribution for active projects
       const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
       // Hide cards after allocation: hidden proposals still compete for funds on-chain.
-      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id)));
+      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id, project.votes)));
 
-      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id)));
+      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id, project.votes)));
     } catch (error) {
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
@@ -356,9 +356,7 @@ export default function Home() {
                   </div>
 
                   {/* Project Description */}
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">
-                    {project.description}
-                  </p>
+                  <ProposalCardDescription id={project.id} description={project.description} />
 
                   {/* Project Details */}
                   <div className="space-y-3 text-sm mb-6">
@@ -474,9 +472,7 @@ export default function Home() {
                   </div>
 
                   {/* Project Description */}
-                  <p className="text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">
-                    {project.description}
-                  </p>
+                  <ProposalCardDescription id={project.id} description={project.description} />
 
                   {/* Project Details */}
                   <div className="space-y-3 text-sm">
@@ -519,4 +515,17 @@ export default function Home() {
 
     </div>
   );
+}
+
+function ProposalCardDescription({ id, description }: { id: number; description: string }) {
+  if (getInvalidProposal(id)) {
+    return (
+      <div role="note" aria-label="Invalid proposal notice" className="mb-6 h-[4.25rem] rounded-lg border border-red-500/50 bg-red-50 px-3 py-2 text-red-900 dark:bg-red-950/40 dark:text-red-200">
+        <p className="text-xs leading-4">
+          <strong>Invalid proposal.</strong> The author asks you to remove your vote.
+        </p>
+      </div>
+    );
+  }
+  return <p className="h-[4.25rem] text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">{description}</p>;
 }

@@ -65,6 +65,6 @@ Edit `config/hidden-proposals.json` to maintain author-requested invalid proposa
 ]
 ```
 
-Listed proposals are hidden from both active and upcoming cards on the home page. Their direct `/projects/<id>` pages remain accessible and display a red author notice asking voters to remove their votes (set the vote to 0%). Unlisted proposals have no notice. Remove an entry to restore the home-page card and clear the notice; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
+Listed proposals with no remaining votes are hidden from both active and upcoming cards on the home page. Those with any remaining raw vote units stay visible with a compact red author notice replacing the card description in the same fixed-height space. Their direct `/projects/<id>` pages remain accessible and display a red author notice asking voters to remove their votes (set the vote to 0%). Unlisted proposals have no notice. Remove an entry to restore the home-page card and clear the notice; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
 
 These are frontend notices recorded at the author's request, not an on-chain invalid status or an automatic vote removal. Hidden proposals still participate in the fund's payment allocation, so the home page calculates payment estimates before hiding their cards. Only add an author notice after confirming the author's request. Proposals 8 and 9 are included at their author's request.
