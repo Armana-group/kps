@@ -39,3 +39,13 @@ test('waits between attempts', async () => {
   await withRetry(async () => { if (++calls < 2) throw new Error('busy'); }, { attempts: 2, delayMs: 50 });
   assert.ok(Date.now() - start >= 45);
 });
+
+test('does not retry errors the caller rules out', async () => {
+  let calls = 0;
+  await assert.rejects(
+    withRetry(async () => { calls++; throw new Error('contract rejected'); },
+      { attempts: 3, delayMs: 0, shouldRetry: error => error instanceof TypeError }),
+    /contract rejected/,
+  );
+  assert.equal(calls, 1);
+});

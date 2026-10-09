@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx"
 import { Contract, Provider, ProviderInterface, SignerInterface, utils } from "koilib"
 import { twMerge } from "tailwind-merge"
 import abiKoinosFund from "./abiKoinosFund"
+import { withRetry } from "./retry"
 
 // const RPC_TESTNET = "https://rpc.koinos-testnet.com";
 // const RPC_MAINNET = "https://api.koinos.io";
@@ -47,12 +48,42 @@ export interface ProcessedVote extends Omit<Vote, 'expiration'> {
   expiration: Date;
 }
 
+export interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
+  monthly_payment: string; // KOIN, 8 decimals
+  start_date: Date;
+  end_date: Date;
+  total_votes: string; // KOIN, 8 decimals
+}
+
+const KOIN_UNITS = 1e8;
+// Project vote totals are stored in 5% vote units of KOIN satoshis
+const VOTE_UNITS = 20 * KOIN_UNITS;
+// The site treats a vote as active for one day past its on-chain expiration
+const VOTE_GRACE_MS = 24 * 3600 * 1000;
+
+/**
+ * Read-only connection to the public RPC, shared by every read. The node turns
+ * away bursts of requests, which browsers report as "Failed to fetch"
+ * (a TypeError), so those calls are retried after a pause.
+ */
+class RetryingProvider extends Provider {
+  async call<T = unknown>(method: string, params: unknown): Promise<T> {
+    return withRetry(() => super.call<T>(method, params), {
+      attempts: 3,
+      delayMs: 1000,
+      shouldRetry: error => error instanceof TypeError,
+    });
+  }
+}
+
+const readProvider = new RetryingProvider("https://api.koinos.io");
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export function getFundContract(
-  provider: ProviderInterface = new Provider("https://api.koinos.io"),
+  provider: ProviderInterface = readProvider,
   signer?: SignerInterface
 ): Contract {
   const contractOptions: {
@@ -74,7 +105,7 @@ export function getFundContract(
 }
 
 export function getKoinContract(
-  provider: ProviderInterface = new Provider("https://api.koinos.io"),
+  provider: ProviderInterface = readProvider,
   signer?: SignerInterface
 ): Contract {
   const { tokenAbi } = utils;
@@ -103,4 +134,48 @@ export function getKoinContract(
   }
 
   return contract;
+}
+
+export async function fetchUserVotes(voter: string): Promise<ProcessedVote[]> {
+  const { result } = await getFundContract().functions.get_user_votes<{ votes: Vote[] }>({ voter });
+  return (result?.votes || []).map(vote => ({
+    ...vote,
+    expiration: new Date(parseInt(vote.expiration) + VOTE_GRACE_MS),
+  }));
+}
+
+export function toProcessedProject(project: Project): ProcessedProject {
+  return {
+    ...project,
+    monthly_payment: (parseInt(project.monthly_payment) / KOIN_UNITS).toFixed(8),
+    start_date: new Date(parseInt(project.start_date)),
+    end_date: new Date(parseInt(project.end_date)),
+    total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / VOTE_UNITS).toFixed(8),
+  };
+}
+
+/** One month's expiring votes, in KOIN. */
+export function voteUnitsToKoin(raw: string): number {
+  return parseInt(raw) / VOTE_UNITS;
+}
+
+/** Projects with a given status, most votes first, up to `maxPages` pages of 10. */
+export async function fetchProjects(status: ProjectStatus, maxPages = 3): Promise<ProcessedProject[]> {
+  const fund = getFundContract();
+  const projects: Project[] = [];
+  let start = "9".repeat(30);
+  for (let page = 0; page < maxPages; page++) {
+    const { result } = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string }>({
+      status,
+      order_by: OrderBy.Votes,
+      limit: 10,
+      start,
+      descending: true,
+    });
+    const batch = result?.projects || [];
+    projects.push(...batch);
+    if (!result?.start_next_page || batch.length === 0) break;
+    start = result.start_next_page;
+  }
+  return projects.map(toProcessedProject);
 }

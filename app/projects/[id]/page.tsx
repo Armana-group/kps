@@ -5,20 +5,13 @@ import { ArrowLeft } from "lucide-react";
 import { VoteButton } from "@/components/vote-button";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatKoin } from "@/lib/format";
-import { getFundContract, ProjectStatus, Project, ProcessedVote, Vote } from "@/lib/utils";
+import { getFundContract, fetchUserVotes, toProcessedProject, voteUnitsToKoin, ProjectStatus, Project, ProcessedProject, ProcessedVote } from "@/lib/utils";
+import { isVoteActive } from "@/lib/vote-budget";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
 import { ProposalNotice } from "@/components/proposal-notice";
 import { getProposalNotice } from "@/lib/proposal-visibility";
-
-interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
-  monthly_payment: string;
-  start_date: Date;
-  end_date: Date;
-  total_votes: string;
-  vote?: ProcessedVote;
-}
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -30,58 +23,22 @@ export default function ProjectDetailPage() {
 
   const projectId = typeof params.id === 'string' ? parseInt(params.id) : null;
 
-  const fetchVote = useCallback(async (): Promise<ProcessedVote | undefined> => {
-    if (!address || !projectId) return undefined;
-    
-    const fund = getFundContract();
-    const votes = await fund.functions.get_user_votes<{ votes: Vote[] }>({
-      voter: address,
-    });
-
-    const processedVotes = (votes?.result?.votes || []).map(vote => ({
-      ...vote,
-      expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
-    }));
-
-    setVotes(processedVotes);
-    return processedVotes.find(v => v.project_id === projectId);
-  }, [address, projectId]);
-
-  const fetchProject = useCallback(async () => {
+  // The project itself: loaded on arrival and refreshed in place after a vote
+  const loadProject = useCallback(async () => {
     if (!projectId || isNaN(projectId)) {
       setError("Invalid project ID");
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    const fund = getFundContract();
-
     try {
-      const result = await fund.functions.get_project<Project>({
-        project_id: projectId,
-      });
-
-      if (!result?.result) {
+      const { result } = await getFundContract().functions.get_project<Project>({ project_id: projectId });
+      if (result) {
+        setProject(toProcessedProject(result));
+        setError(null);
+      } else {
         setError("Project not found");
-        setLoading(false);
-        return;
       }
-
-      const projectData = result.result;
-      const userVote = await fetchVote();
-
-      const processedProject: ProcessedProject = {
-        ...projectData,
-        monthly_payment: (parseInt(projectData.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(projectData.start_date)),
-        end_date: new Date(parseInt(projectData.end_date)),
-        total_votes: (projectData.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: userVote,
-      };
-
-      setProject(processedProject);
     } catch (error) {
       console.error("Error fetching project:", error);
       setError("Failed to load project. Please try again.");
@@ -89,21 +46,29 @@ export default function ProjectDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, fetchVote]);
+  }, [projectId]);
+
+  // The connected wallet's votes, loaded separately so connecting a wallet doesn't reload the project
+  const loadVotes = useCallback(async () => {
+    try {
+      setVotes(address ? await fetchUserVotes(address) : []);
+    } catch (error) {
+      console.error("Error fetching votes:", error);
+    }
+  }, [address]);
 
   useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
+    loadProject();
+  }, [loadProject]);
 
   useEffect(() => {
-    if (!projectId) return;
-    
-    fetchVote().then((vote) => {
-      if (vote && project) {
-        setProject(prev => prev ? { ...prev, vote } : null);
-      }
-    });
-  }, [address, projectId, fetchVote, project?.id]); // Use project.id to avoid infinite loop
+    loadVotes();
+  }, [loadVotes]);
+
+  const refresh = () => {
+    loadVotes();
+    loadProject();
+  };
 
   const statusText = (status: ProjectStatus) => {
     switch (status) {
@@ -146,12 +111,13 @@ export default function ProjectDetailPage() {
   const proposalNotice = getProposalNotice(project.id);
   const now = new Date();
   const totalVotes = parseFloat(project.total_votes);
-  const activeVote = project.vote && project.vote.weight > 0 && project.vote.expiration >= now ? project.vote : undefined;
-  const expiredVote = project.vote && project.vote.weight > 0 && project.vote.expiration < now ? project.vote : undefined;
+  const vote = votes.find(v => v.project_id === project.id);
+  const activeVote = vote && isVoteActive(vote, now) ? vote : undefined;
+  const expiredVote = vote && vote.weight > 0 && !activeVote ? vote : undefined;
 
   // Votes grouped by the month they expire in, oldest first; empty months are skipped
   const expiryBuckets = project.votes
-    .map((raw, index) => ({ months: index + 1, amount: parseInt(raw) / 20e8 }))
+    .map((raw, index) => ({ months: index + 1, amount: voteUnitsToKoin(raw) }))
     .filter(bucket => bucket.amount > 0);
   const maxBucket = Math.max(0, ...expiryBuckets.map(b => b.amount));
   const paymentCount = Math.max(0, countMonthEnds(project.start_date, project.end_date));
@@ -237,10 +203,9 @@ export default function ProjectDetailPage() {
                 variant="panel"
                 projectId={project.id}
                 projectTitle={project.title}
-                vote={project.vote}
                 votes={votes}
                 titles={{ [project.id]: project.title }}
-                onVoteSuccess={fetchProject}
+                onVoteSuccess={refresh}
               />
             </div>
             <p className="mt-3.5 text-center text-[13px] text-ink-2">Voting signs one transaction in Kondor. Nothing is spent.</p>

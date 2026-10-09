@@ -1,14 +1,14 @@
 "use client";
 
-import { formatCountdown, formatDate, formatKoin } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { formatCountdown, formatDate, formatKoin, formatShare } from '@/lib/format';
+import type { PaymentStatus } from '@/lib/payouts';
 
 interface PayoutProject {
   id: number;
   title: string;
   monthly_payment: string;
   calculatedPayment?: number;
-  paymentStatus?: 'full' | 'partial' | 'none';
+  paymentStatus?: PaymentStatus;
 }
 
 interface PayoutPanelProps {
@@ -68,15 +68,13 @@ export function PayoutPanel({ fundBalance, nextPaymentTime, activeProjects, upco
 
       <ul className="mt-5 grid gap-2.5 text-sm">
         {shown.map((p, i) => {
-          const monthly = parseFloat(p.monthly_payment);
-          const share = monthly > 0 ? ((p.calculatedPayment ?? 0) / monthly) * 100 : 0;
           return (
             <li key={p.id} className="grid grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3">
               <span className="size-2.5 rounded-[3px]" style={segmentStyle(i)} aria-hidden="true" />
               <span className="truncate font-medium">
                 {p.title}{' '}
                 <small className="font-normal text-ink-2">
-                  · {p.paymentStatus === 'full' ? 'paid in full' : `partial, ${share < 1 ? share.toFixed(1) : Math.round(share)}% of its ask`}
+                  · {p.paymentStatus === 'full' ? 'paid in full' : `partial, ${formatShare(p.calculatedPayment ?? 0, parseFloat(p.monthly_payment))}% of its ask`}
                 </small>
               </span>
               <span className="font-semibold tabular-nums">{formatKoin(p.calculatedPayment ?? 0)}</span>
@@ -107,7 +105,7 @@ export function PayoutPanel({ fundBalance, nextPaymentTime, activeProjects, upco
           </li>
         )}
         {!loading && paid.length === 0 && (
-          <li className={cn('text-ink-2')}>No active project has votes yet, so nothing is paid out this month.</li>
+          <li className="text-ink-2">No active project has votes yet, so nothing is paid out this month.</li>
         )}
       </ul>
 

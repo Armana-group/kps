@@ -5,7 +5,8 @@ import { VoteButton } from '@/components/vote-button';
 import { ProposalNotice } from '@/components/proposal-notice';
 import { getProposalNotice } from '@/lib/proposal-visibility';
 import { ProcessedVote } from '@/lib/utils';
-import { formatDate, formatKoin } from '@/lib/format';
+import type { PaymentStatus } from '@/lib/payouts';
+import { formatDate, formatKoin, formatShare, formatShortDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 export interface RowProject {
@@ -16,9 +17,8 @@ export interface RowProject {
   monthly_payment: string;
   start_date: Date;
   end_date: Date;
-  vote?: ProcessedVote;
   calculatedPayment?: number;
-  paymentStatus?: 'full' | 'partial' | 'none';
+  paymentStatus?: PaymentStatus;
 }
 
 interface ProjectRowProps {
@@ -44,7 +44,7 @@ export function ProjectRowHeader({ kind, nextPaymentTime }: { kind: 'active' | '
       <span className="text-right">Votes (KOIN)</span>
       <span className="text-right">Asks per month</span>
       <span className="text-right">
-        {kind === 'active' ? (nextPaymentTime ? `Gets on ${formatDate(nextPaymentTime).replace(/, \d{4}$/, '')}` : 'Next payout') : 'Starts'}
+        {kind === 'active' ? (nextPaymentTime ? `Gets on ${formatShortDate(nextPaymentTime)}` : 'Next payout') : 'Starts'}
       </span>
       <span />
     </div>
@@ -65,8 +65,7 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
   } else if (project.paymentStatus === 'full') {
     third = { main: formatKoin(project.calculatedPayment ?? 0), sub: 'Full payment', dim: false };
   } else if (project.paymentStatus === 'partial') {
-    const share = monthly > 0 ? ((project.calculatedPayment ?? 0) / monthly) * 100 : 0;
-    third = { main: formatKoin(project.calculatedPayment ?? 0), sub: `Partial, ${share < 1 ? share.toFixed(1) : Math.round(share)}% of ask`, dim: false };
+    third = { main: formatKoin(project.calculatedPayment ?? 0), sub: `Partial, ${formatShare(project.calculatedPayment ?? 0, monthly)}% of ask`, dim: false };
   } else {
     third = { main: '0', sub: totalVotes === 0 ? 'No votes yet' : 'Fund runs out first', dim: true };
   }
@@ -74,7 +73,7 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
   return (
     <article className={cn('border-t border-line py-6', rowGrid, 'flex flex-col gap-3.5')}>
       <div className="flex gap-4 lg:contents">
-        <span className={cn('w-7 shrink-0 pt-0.5 text-[15px] font-medium tabular-nums lg:w-auto lg:pt-0', muted ? 'text-ink-3' : 'text-ink-3')}>{rank}</span>
+        <span className="w-7 shrink-0 pt-0.5 text-[15px] font-medium tabular-nums text-ink-3 lg:w-auto lg:pt-0">{rank}</span>
         <div className="min-w-0 flex-1">
           <h3 className={cn('text-[18px] font-semibold leading-snug tracking-[-0.015em]', muted && 'text-ink-3')}>
             <Link href={`/projects/${project.id}`} className="hover:underline hover:underline-offset-[3px] hover:decoration-1">
@@ -89,7 +88,7 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
         </div>
       </div>
 
-      <div className={cn('flex items-end justify-between gap-6 pl-11 lg:contents lg:pl-0')}>
+      <div className="flex items-end justify-between gap-6 pl-11 lg:contents lg:pl-0">
         <div className="min-w-[120px] text-left lg:text-right">
           <b className={cn('block text-[15px] font-semibold tabular-nums', muted && 'text-ink-3')}>{formatKoin(totalVotes)}</b>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-panel-strong" aria-hidden="true">
@@ -107,7 +106,6 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
           <VoteButton
             projectId={project.id}
             projectTitle={project.title}
-            vote={project.vote}
             votes={votes}
             titles={titles}
             onVoteSuccess={onVoteSuccess}
@@ -120,7 +118,7 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
         <div>
           {kind === 'active' ? 'Gets ' : 'Starts '}
           <b className={cn('font-medium tabular-nums', third.dim ? 'text-ink-3' : 'text-ink')}>{third.main}</b>
-          {kind === 'active' && nextPaymentTime ? ` on ${formatDate(nextPaymentTime).replace(/, \d{4}$/, '')}` : ''}
+          {kind === 'active' && nextPaymentTime ? ` on ${formatShortDate(nextPaymentTime)}` : ''}
         </div>
       </dl>
     </article>

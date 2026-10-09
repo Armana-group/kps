@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Button, ButtonArrow } from '@/components/ui/button';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { ProcessedVote } from '@/lib/utils';
-import { getVoteBudget } from '@/lib/vote-budget';
+import { getVoteBudget, isVoteActive } from '@/lib/vote-budget';
 import { useSubmitVote } from '@/hooks/useSubmitVote';
 import { Loader2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -14,8 +14,7 @@ import { cn } from '@/lib/utils';
 interface VoteButtonProps {
   projectId: number;
   projectTitle?: string;
-  vote?: ProcessedVote;
-  /** All of the wallet's votes, so the modal can show how much is left to give. */
+  /** All of the wallet's votes: this project's vote and how much is left to give. */
   votes?: ProcessedVote[];
   /** Project titles by id, used to name the other votes in error messages. */
   titles?: Record<number, string>;
@@ -24,7 +23,7 @@ interface VoteButtonProps {
   variant?: 'row' | 'panel';
 }
 
-export function VoteButton({ projectId, projectTitle, vote, votes = [], titles = {}, onVoteSuccess, variant = 'row' }: VoteButtonProps) {
+export function VoteButton({ projectId, projectTitle, votes = [], titles = {}, onVoteSuccess, variant = 'row' }: VoteButtonProps) {
   const { isConnected, address } = useKondorWalletContext();
   const submitVote = useSubmitVote();
   const [isVoting, setIsVoting] = useState(false);
@@ -33,8 +32,9 @@ export function VoteButton({ projectId, projectTitle, vote, votes = [], titles =
 
   const now = new Date();
   const { usedPercent: otherVotesPercent, remainingPercent } = getVoteBudget(votes, now, projectId);
-  const activeVote = vote && vote.weight > 0 && vote.expiration >= now ? vote : undefined;
-  const expiredVote = vote && vote.weight > 0 && vote.expiration < now ? vote : undefined;
+  const vote = votes.find(v => v.project_id === projectId);
+  const activeVote = vote && isVoteActive(vote, now) ? vote : undefined;
+  const expiredVote = vote && vote.weight > 0 && !activeVote ? vote : undefined;
 
   const handleVoteClick = () => {
     if (!isConnected || !address) {

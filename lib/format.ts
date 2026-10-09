@@ -13,9 +13,15 @@ export function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** "Oct 2026" */
-export function formatMonth(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+/** "Oct 31" */
+export function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** Share of an ask that gets paid, as a percent: "0.4" below 1%, whole numbers above. */
+export function formatShare(paid: number, ask: number): string {
+  const share = ask > 0 ? (paid / ask) * 100 : 0;
+  return share < 1 ? share.toFixed(1) : String(Math.round(share));
 }
 
 /** "in 22 days", "tomorrow", "today", or "passed". */

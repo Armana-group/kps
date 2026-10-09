@@ -35,21 +35,14 @@ export function useSubmitVote() {
       const fund = getFundContract(provider, signer);
 
       // Create and send the vote transaction
-      const { transaction, receipt } = await fund.functions.update_vote({
+      const { transaction } = await fund.functions.update_vote({
         voter: address,
         project_id: projectId,
         weight: votePercentage / 5, // the contract stores weight in 5% units
       });
 
-      console.log('Vote transaction result:', { transaction, receipt });
-
       // Wait for the transaction to be mined (if transaction exists)
-      if (transaction?.id) {
-        const { blockNumber } = await provider.wait(transaction.id);
-        console.log(`Vote transaction mined in block ${blockNumber}`);
-      }
-
-      return { transaction, votePercentage };
+      if (transaction?.id) await provider.wait(transaction.id);
     };
 
     try {
@@ -57,9 +50,7 @@ export function useSubmitVote() {
         submitVote(),
         {
           loading: votePercentage === 0 ? 'Removing your vote...' : 'Submitting your vote...',
-          success: (data) => data.votePercentage === 0
-            ? 'Vote removed.'
-            : `Vote of ${data.votePercentage}% submitted successfully!`,
+          success: votePercentage === 0 ? 'Vote removed.' : `Vote of ${votePercentage}% submitted successfully!`,
           error: (error) => explainVoteError(error, votes, new Date(), projectId, titles)
             ?? 'Failed to submit vote. Please try again.',
         },
