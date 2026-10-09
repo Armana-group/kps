@@ -2,99 +2,62 @@
 
 import { useState } from 'react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  User, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  LogOut, 
-  Wallet,
-  ChevronDown
-} from 'lucide-react';
+import { Copy, Check, ExternalLink, LogOut } from 'lucide-react';
+import { shortAddress } from '@/lib/format';
 
 export function UserMenu() {
   const { address, disconnect } = useKondorWalletContext();
   const [copied, setCopied] = useState(false);
 
-  const handleCopyAddress = async () => {
-    if (address) {
-      await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const truncateAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-  };
-
-
-
   if (!address) return null;
+
+  const copyAddress = async () => {
+    await navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 px-3 py-2 bg-secondary/50 border border-border rounded-xl hover:bg-secondary/70 transition-all duration-200 group">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium font-mono">
-            {truncateAddress(address)}
-          </span>
-          <ChevronDown className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+        <button
+          type="button"
+          className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-paper transition-opacity hover:opacity-85"
+          aria-label={`Connected wallet ${address}`}
+        >
+          <span className="mono font-medium">{shortAddress(address)}</span>
         </button>
       </DropdownMenuTrigger>
-      
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="flex items-center gap-2 pb-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">Connected Wallet</span>
-            <span className="text-xs text-muted-foreground font-mono">
-              {truncateAddress(address)}
-            </span>
-          </div>
-        </DropdownMenuLabel>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem onClick={handleCopyAddress} className="cursor-pointer">
-          {copied ? (
-            <Check className="w-4 h-4 mr-3 text-green-500" />
-          ) : (
-            <Copy className="w-4 h-4 mr-3" />
-          )}
-          {copied ? 'Address Copied!' : 'Copy Address'}
+
+      <DropdownMenuContent align="end" className="w-72 rounded-[20px] border-line p-2 shadow-[0_24px_48px_-24px_rgba(0,0,0,.25)]">
+        <div className="px-3 pb-2 pt-2">
+          <p className="text-sm font-semibold">Connected with Kondor</p>
+          <p className="mono mt-1 break-all text-ink-2">{address}</p>
+        </div>
+        <DropdownMenuSeparator className="bg-line" />
+        <DropdownMenuItem onClick={copyAddress} className="cursor-pointer rounded-xl px-3 py-2.5">
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          {copied ? 'Copied' : 'Copy address'}
         </DropdownMenuItem>
-        
-        <DropdownMenuItem 
-          onClick={() => window.open('https://www.koinscan.com/address/' + address, '_blank')} 
-          className="cursor-pointer"
-        >
-          <Wallet className="w-4 h-4 mr-3" />
-          View on Koinscan
-          <ExternalLink className="w-3 h-3 ml-auto text-muted-foreground" />
+        <DropdownMenuItem asChild className="cursor-pointer rounded-xl px-3 py-2.5">
+          <a href={`https://koinscan.com/address/${address}`} target="_blank" rel="noreferrer">
+            <ExternalLink className="size-4" />
+            View on KoinScan
+          </a>
         </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={disconnect} 
-          className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-        >
-          <LogOut className="w-4 h-4 mr-3" />
-          Disconnect Wallet
+        <DropdownMenuSeparator className="bg-line" />
+        <DropdownMenuItem onClick={disconnect} className="cursor-pointer rounded-xl px-3 py-2.5">
+          <LogOut className="size-4" />
+          Disconnect
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-} 
+}

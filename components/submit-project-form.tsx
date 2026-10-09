@@ -6,11 +6,12 @@ import { PaymentSchedulePreview } from '@/components/payment-schedule-preview';
 import { getProjectDateTimestamps } from '@/lib/payment-schedule';
 import { FloatingInput, FloatingTextarea } from '@/components/ui/floating-input';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Loader2, Calculator, ArrowLeft } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { getFundContract, getKoinContract } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { MAX_PROJECT_DESCRIPTION_LENGTH } from '@/lib/project-limits';
+import { formatKoin } from '@/lib/format';
 import { ProviderInterface, SignerInterface } from 'koilib';
 import { useRouter } from 'next/navigation';
 
@@ -278,8 +279,8 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-2">
-      <div className="space-y-8">
+    <div>
+      <div className="space-y-6">
                 {/* Project Title */}
         <div className="space-y-2">
           <FloatingInput
@@ -301,7 +302,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
             error={errors.description}
             rows={5}
           />
-          <p id="description-character-count" className="text-sm text-muted-foreground text-right">
+          <p id="description-character-count" className="text-[13px] tabular-nums text-ink-2 text-right">
             {formData.description.length}/{MAX_PROJECT_DESCRIPTION_LENGTH} characters
           </p>
         </div>
@@ -319,7 +320,7 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
               error={errors.monthly_payment}
               className="pr-16"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-2 font-medium">
               KOIN
             </span>
           </div>
@@ -365,64 +366,40 @@ export function SubmitProjectForm({ onSuccess }: SubmitProjectFormProps) {
         />
 
         {/* Fee Information */}
-        <div className="bg-muted/30 rounded-2xl p-6 border border-border/50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">Submission Fee</h3>
-              <p className="text-sm text-muted-foreground">
-                Calculated based on project duration and current network activity
-              </p>
-            </div>
+        <div className="rounded-2xl border border-line-strong p-5">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-[16px] font-semibold tracking-[-0.01em]">Submission fee</h3>
+            {isCalculatingFee ? (
+              <span className="flex items-center gap-2 text-sm text-ink-2"><Loader2 className="size-3.5 animate-spin" />Calculating</span>
+            ) : calculatedFee ? (
+              <span className="text-[22px] font-semibold tracking-[-0.02em] tabular-nums">{formatKoin(calculatedFee)} <small className="text-sm font-medium text-ink-2">KOIN</small></span>
+            ) : null}
           </div>
-
-          {isCalculatingFee ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Calculating fee...</span>
-            </div>
-          ) : calculatedFee ? (
-            <div className="flex items-center justify-between">
-              <span className="text-base font-medium">Total Fee:</span>
-              <span className="text-2xl font-bold text-primary">{calculatedFee} KOIN</span>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">
-              Set start and end dates to calculate the submission fee
-            </p>
-          )}
+          <p className="mt-1.5 text-sm text-ink-2">
+            {calculatedFee
+              ? 'Charged once, when you submit. It grows with the project length and the number of open proposals.'
+              : 'Set the start and end dates to see the fee. It grows with the project length and the number of open proposals.'}
+          </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
           <Button
             variant="outline"
+            size="lg"
             onClick={() => router.back()}
-            className="flex-1 h-14 text-base border-2 rounded-xl hover:bg-muted/50 transition-all duration-200"
+            className="sm:flex-1"
             disabled={isLoading}
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
+            Cancel
           </Button>
-
           <Button
+            size="lg"
             onClick={handleSubmit}
             disabled={isLoading || !isConnected || !calculatedFee || isCalculatingFee || formData.description.length > MAX_PROJECT_DESCRIPTION_LENGTH}
-            className="flex-1 h-14 text-base rounded-xl bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="sm:flex-[2]"
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5 mr-2" />
-                Submit Project
-              </>
-            )}
+            {isLoading ? <><Loader2 className="animate-spin" />Waiting for Kondor</> : isConnected ? 'Submit and pay the fee' : 'Connect a wallet to submit'}
           </Button>
         </div>
       </div>

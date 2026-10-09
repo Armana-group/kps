@@ -1,529 +1,254 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { getProposalNotice, isProposalHidden } from "@/lib/proposal-visibility";
-import { ProposalNotice } from "@/components/proposal-notice";
-import { VoteButton } from "@/components/vote-button";
-import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
+import { isProposalHidden } from "@/lib/proposal-visibility";
+import { YourVotes } from "@/components/your-votes";
+import { HeaderSlot } from "@/components/header-slot";
+import { PayoutPanel } from "@/components/payout-panel";
+import { ProjectRow, ProjectRowHeader, ProjectRowSkeleton } from "@/components/project-row";
+import { HowItWorks } from "@/components/how-it-works";
+import { Button, ButtonArrow } from "@/components/ui/button";
+import { getFundContract, getKoinContract, fetchProjects, fetchUserVotes, ProjectStatus, Project, ProcessedProject, ProcessedVote, FUND_ADDRESS } from "@/lib/utils";
+import { distributePayments, estimatePayoutBudget, isInPayout, type PayoutBudget } from "@/lib/payouts";
+import { formatShortDate } from "@/lib/format";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 
-// Interface for processed project data
-interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date' | 'end_date'> {
-  monthly_payment: string; // Formatted with 8 decimals
-  start_date: Date;
-  end_date: Date;
-  total_votes: string;
-  vote?: ProcessedVote;
-  calculatedPayment?: number; // Amount this project will receive in next payment
-  paymentStatus?: 'full' | 'partial' | 'none'; // Payment status based on fund availability
-}
+type PayoutProject = ReturnType<typeof distributePayments<ProcessedProject>>[number];
 
 export default function Home() {
-  const pageSize = 10; // Number of projects to fetch per page
-  const pageStart = "9".repeat(30); // Starting point for pagination
-
   const { address } = useKondorWalletContext();
-  const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
+  const [activeProjects, setActiveProjects] = useState<PayoutProject[]>([]);
+  const [payouts, setPayouts] = useState<PayoutProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
-  const [, setVotes] = useState<ProcessedVote[]>([]);
+  const [votes, setVotes] = useState<ProcessedVote[]>([]);
+  const [voteTitles, setVoteTitles] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
-  const [fundBalance, setFundBalance] = useState<number | null>(null);
+  const [payoutBudget, setPayoutBudget] = useState<PayoutBudget | null>(null);
   const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
 
-  // Calculate payment distribution based on fund balance and project monthly payments
-  const calculatePaymentDistribution = useCallback((projects: ProcessedProject[], availableBalance: number) => {
-    if (availableBalance <= 0) {
-      return projects.map(project => ({
-        ...project,
-        calculatedPayment: 0,
-        paymentStatus: 'none' as const
-      }));
-    }
+  // Each load gets an id; only the latest one may update the page, so a slow
+  // older load can't overwrite newer results.
+  const projectsLoadId = useRef(0);
+  const votesLoadId = useRef(0);
 
-    let remainingBalance = availableBalance;
-    const updatedProjects = [...projects];
-
-    // Sort projects by votes (highest first) to prioritize higher-voted projects
-    updatedProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
-
-    for (let i = 0; i < updatedProjects.length; i++) {
-      const project = updatedProjects[i];
-      const monthlyPayment = parseFloat(project.monthly_payment);
-
-      if (parseFloat(project.total_votes) === 0) {
-        updatedProjects[i] = {
-          ...project,
-          calculatedPayment: 0,
-          paymentStatus: 'none' as const
-        };
-      } else if (remainingBalance >= monthlyPayment) {
-        // Full payment
-        updatedProjects[i] = {
-          ...project,
-          calculatedPayment: monthlyPayment,
-          paymentStatus: 'full' as const
-        };
-        remainingBalance -= monthlyPayment;
-      } else if (remainingBalance > 0) {
-        // Partial payment
-        updatedProjects[i] = {
-          ...project,
-          calculatedPayment: remainingBalance,
-          paymentStatus: 'partial' as const
-        };
-        remainingBalance = 0;
-      } else {
-        // No payment
-        updatedProjects[i] = {
-          ...project,
-          calculatedPayment: 0,
-          paymentStatus: 'none' as const
-        };
-      }
-    }
-
-    return updatedProjects;
-  }, []);
-
-  const fetchFundData = useCallback(async (): Promise<Date | null> => {
-    // fund balance
-    const koin = getKoinContract();
-    const { result: balanceResult } = await koin.functions.balanceOf<{ value: string }>({
-      owner: FUND_ADDRESS,
-    });
-    const balance = parseInt(balanceResult?.value || "0") / 1e8;
-    setFundBalance(balance);
-
-    // fund global vars
-    const fund = getFundContract();
-    const { result: globalVarsResult } = await fund.functions.get_global_vars<{
-      total_projects: number;
-      total_active_projects: number;
-      payment_times: string[];
-    }>();
-    const nextPaymentTime = globalVarsResult?.payment_times[0];
-    const nextPaymentTimeDate = nextPaymentTime ? new Date(parseInt(nextPaymentTime)) : null;
-    setNextPaymentTime(nextPaymentTimeDate);
-    return nextPaymentTimeDate;
-  }, []);
-
-  const fetchVotes = useCallback(async (): Promise<ProcessedVote[]> => {
-    if (!address) return [];
-    const fund = getFundContract();
-    const votes = await fund.functions.get_user_votes<{ votes: Vote[] }>({
-      voter: address,
-    });
-
-    const processedVotes = (votes?.result?.votes || []).map(vote => ({
-      ...vote,
-      expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
-    }));
-
-    setVotes(processedVotes);
-    return processedVotes;
-  }, [address]);
-
-  const fetchProjects = useCallback(async (currentVotes: ProcessedVote[], nextPaymentTime: Date | null) => {
-    setLoading(true);
-    const fund = getFundContract();
-    console.log("fetching projects");
+  // Fund balance, payout time and projects: loaded on arrival and refreshed in
+  // place after a vote. Votes load separately, so connecting a wallet doesn't
+  // reload all of this.
+  const loadProjects = useCallback(async () => {
+    const loadId = ++projectsLoadId.current;
 
     try {
+      const [balanceResult, globalVarsResult, active, upcoming] = await Promise.all([
+        getKoinContract().functions.balanceOf<{ value: string }>({ owner: FUND_ADDRESS }),
+        getFundContract().functions.get_global_vars<{ payment_times: string[]; remaining_balance?: string }>(),
+        fetchProjects(ProjectStatus.Active),
+        fetchProjects(ProjectStatus.Upcoming),
+      ]);
+      if (loadId !== projectsLoadId.current) return;
+
+      const balance = parseInt(balanceResult.result?.value || "0") / 1e8;
+      const remainingBalance = parseInt(globalVarsResult.result?.remaining_balance || "0") / 1e8;
+      const nextPaymentTimestamp = globalVarsResult.result?.payment_times[0];
+      const nextPayment = nextPaymentTimestamp ? new Date(parseInt(nextPaymentTimestamp)) : null;
       const now = new Date();
 
-      // Fetch active projects - 3 pages
-      const allActiveProjects: Project[] = [];
-      let activeStart = pageStart;
-      const activePagesToFetch = 3;
+      // At payout time the contract activates projects that have started and
+      // retires ones that have ended, then pays in vote order from the budget
+      const budget = nextPayment ? estimatePayoutBudget({ balance, remainingBalance, nextPayout: nextPayment, now }) : null;
+      const inPayout = [...active, ...upcoming].filter(project => isInPayout(project, nextPayment ?? now));
+      const allocated = distributePayments(inPayout, budget?.budget ?? 0, FUND_ADDRESS);
 
-      for (let page = 0; page < activePagesToFetch; page++) {
-        const activeResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
-          status: ProjectStatus.Active,
-          order_by: OrderBy.Votes,
-          limit: pageSize,
-          start: activeStart,
-          descending: true,
-        });
-
-        const projects = activeResult?.result?.projects || [];
-        allActiveProjects.push(...projects);
-
-        // Use start_next_page for the next iteration, or break if there's no next page
-        const nextPageStart = activeResult?.result?.start_next_page;
-        if (!nextPageStart || projects.length === 0) {
-          break; // No more pages available
-        }
-        activeStart = nextPageStart;
-      }
-
-      const processedActiveProjects = allActiveProjects.map(project => ({
-        ...project,
-        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(project.start_date)),
-        end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: currentVotes.find(v => v.project_id === project.id),
-      }));
-
-      // Fetch upcoming projects - 3 pages
-      const allUpcomingProjects: Project[] = [];
-      let upcomingStart = pageStart;
-      const upcomingPagesToFetch = 3;
-
-      for (let page = 0; page < upcomingPagesToFetch; page++) {
-        const upcomingResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
-          status: ProjectStatus.Upcoming,
-          order_by: OrderBy.Votes,
-          limit: pageSize,
-          start: upcomingStart,
-          descending: true,
-        });
-
-        const projects = upcomingResult?.result?.projects || [];
-        allUpcomingProjects.push(...projects);
-
-        // Use start_next_page for the next iteration, or break if there's no next page
-        const nextPageStart = upcomingResult?.result?.start_next_page;
-        if (!nextPageStart || projects.length === 0) {
-          break; // No more pages available
-        }
-        upcomingStart = nextPageStart;
-      }
-
-      const processedUpcomingProjects = allUpcomingProjects.map(project => ({
-        ...project,
-        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(project.start_date)),
-        end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: currentVotes.find(v => v.project_id === project.id),
-      }));
-
-      // Filter and move projects based on dates
-      // Remove active projects that end before next payment
-      const filteredActiveProjects = processedActiveProjects.filter(project => {
-        if (!nextPaymentTime) return true; // Keep all if no next payment time
-        return project.end_date >= nextPaymentTime;
-      });
-
-      // Move upcoming projects that have started to active list
-      const projectsToMoveToActive = processedUpcomingProjects.filter(project => 
-        project.start_date <= now
-      );
-      const remainingUpcomingProjects = processedUpcomingProjects.filter(project => 
-        project.start_date > now
-      );
-
-      // Combine moved projects with active projects
-      const finalActiveProjects = [...filteredActiveProjects, ...projectsToMoveToActive];
-
-      // Sort active projects by votes (highest first)
-      finalActiveProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
-
-      // Calculate payment distribution for active projects
-      const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
+      setPayoutBudget(budget);
+      setNextPaymentTime(nextPayment);
+      setPayouts(allocated);
       // Hide cards after allocation: hidden proposals still compete for funds on-chain.
-      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id, project.votes)));
-
-      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id, project.votes)));
+      setActiveProjects(allocated.filter(project => project.start_date <= now && !isProposalHidden(project.id, project.votes)));
+      setUpcomingProjects(upcoming.filter(project => project.start_date > now && !isProposalHidden(project.id, project.votes)));
     } catch (error) {
+      if (loadId !== projectsLoadId.current) return;
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
     } finally {
-      setLoading(false);
+      if (loadId === projectsLoadId.current) setLoading(false);
     }
-  }, [pageSize, pageStart, setActiveProjects, setUpcomingProjects, calculatePaymentDistribution, fundBalance]);
+  }, []);
 
-  const fetchData = useCallback(async () => {
-    const currentVotes = await fetchVotes();
-    const nextPaymentTime = await fetchFundData(); // Fetch fund balance first
-    await fetchProjects(currentVotes, nextPaymentTime); // Then calculate payments with the balance
-  }, [fetchVotes, fetchProjects, fetchFundData]);
+  // The connected wallet's votes: loaded when the wallet changes, and after a vote.
+  const loadVotes = useCallback(async () => {
+    const loadId = ++votesLoadId.current;
+    try {
+      const processedVotes = address ? await fetchUserVotes(address) : [];
+      if (loadId === votesLoadId.current) setVotes(processedVotes);
+    } catch (error) {
+      console.error("Error fetching votes:", error);
+    }
+  }, [address]);
+
+  const refresh = useCallback(() => {
+    loadVotes();
+    loadProjects();
+  }, [loadVotes, loadProjects]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadProjects();
+  }, [loadProjects]);
 
   useEffect(() => {
-    console.log("fetching votes, address:", address);
-    fetchVotes().then((processedVotes) => {
-      console.log("votes fetched");
-      if (!processedVotes) return;
+    loadVotes();
+  }, [loadVotes]);
 
-      setActiveProjects(prevActive => prevActive.map(project => ({
-        ...project,
-        vote: processedVotes.find(v => v.project_id === project.id),
-      })));
+  // Titles for the wallet's votes. Listed projects already have theirs; the rest
+  // (past or hidden projects) are fetched one at a time to stay under the RPC's burst limit.
+  const listedTitles: Record<number, string> = Object.fromEntries(
+    [...activeProjects, ...upcomingProjects].map(project => [project.id, project.title]),
+  );
+  const titles = { ...listedTitles, ...voteTitles };
 
-      setUpcomingProjects(prevUpcoming => prevUpcoming.map(project => ({
-        ...project,
-        vote: processedVotes.find(v => v.project_id === project.id),
-      })));
-    });
-  }, [address, fetchVotes, setActiveProjects, setUpcomingProjects]);
+  useEffect(() => {
+    if (loading) return;
+    const missingIds = votes.map(vote => vote.project_id).filter(id => !(id in listedTitles) && !(id in voteTitles));
+    if (missingIds.length === 0) return;
 
+    let cancelled = false;
+    (async () => {
+      const fund = getFundContract();
+      for (const id of missingIds) {
+        const { result } = await fund.functions.get_project<Project>({ project_id: id });
+        if (cancelled) return;
+        // Saved one by one, so a restart skips titles already fetched
+        setVoteTitles(prev => ({ ...prev, [id]: result?.title ?? `Project #${id}` }));
+      }
+    })().catch(error => console.error("Error fetching voted project titles:", error));
+    return () => { cancelled = true; };
+    // listedTitles is derived from activeProjects/upcomingProjects
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, votes, voteTitles, activeProjects, upcomingProjects]);
 
+  const maxActiveVotes = Math.max(0, ...activeProjects.map(p => parseFloat(p.total_votes)));
+  const maxUpcomingVotes = Math.max(0, ...upcomingProjects.map(p => parseFloat(p.total_votes)));
+  const nextPayoutLabel = nextPaymentTime ? formatShortDate(nextPaymentTime) : 'the next payout';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div>
+      {address && (
+        <HeaderSlot>
+          <YourVotes votes={votes} titles={titles} onChange={refresh} />
+        </HeaderSlot>
+      )}
 
-      {/* Hero Section */}
-      <section className="relative py-20 lg:py-32">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-display mb-6 tracking-tight">
-            Koinos Fund System
+      {/* Hero */}
+      <section className="wrap grid items-center gap-10 pb-16 pt-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-16 lg:pb-20 lg:pt-16">
+        <div>
+          <h1 className="max-w-[15ch] text-[40px] font-bold leading-[1.02] tracking-[-0.035em] text-balance lg:text-[56px]">
+            The Koinos community decides what gets funded.
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
-            Empowering the Koinos blockchain through community-driven funding decisions.
-            Vote on projects that shape the future of decentralized innovation.
+          <p className="mt-6 max-w-[44ch] text-[18px] leading-normal text-ink-2">
+            Every month the fund pays the projects with the most support. Vote with the KOIN and VHP you already hold. Nothing is spent and nothing is locked.
           </p>
-
-          {/* Fund Stats Display */}
-          <div className="inline-flex bg-card border border-border rounded-2xl px-8 py-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row gap-8">
-              {/* Fund Balance */}
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-primary rounded-full"></div>
-                <div className="text-left">
-                  <p className="text-sm text-muted-foreground font-medium">Fund Balance</p>
-                  <p className="text-2xl font-bold font-mono">
-                    {fundBalance !== null ? `${fundBalance.toLocaleString()} KOIN` : 'Loading...'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Next Payment Time */}
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <div className="text-left">
-                  <p className="text-sm text-muted-foreground font-medium">Next Payment</p>
-                  <p className="text-2xl font-bold font-mono">
-                    {nextPaymentTime ? nextPaymentTime.toLocaleDateString() : 'Loading...'}
-                  </p>
-                  {nextPaymentTime && (
-                    <p className="text-xs text-muted-foreground">
-                      {nextPaymentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Button size="lg" asChild>
+              <a href="#active">Vote on projects <ButtonArrow /></a>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/submit">Submit a project</Link>
+            </Button>
           </div>
+          <p className="mt-7 text-sm text-ink-2">
+            New here? <Link href="/docs" className="text-ink underline underline-offset-[3px]">Read how voting works</Link> in about three minutes.
+          </p>
+        </div>
+
+        <PayoutPanel
+          budget={payoutBudget}
+          nextPaymentTime={nextPaymentTime}
+          payouts={payouts}
+          activeCount={activeProjects.length}
+          upcomingCount={upcomingProjects.length}
+          loading={loading}
+        />
+      </section>
+
+      {/* Active */}
+      <section className="wrap pt-14" id="active" aria-labelledby="active-heading">
+        <div className="mb-5 flex items-end justify-between gap-6">
+          <div>
+            <h2 id="active-heading" className="text-[24px] font-semibold leading-tight tracking-[-0.025em] lg:text-[28px]">Being paid now</h2>
+            <p className="mt-1.5 text-[15px] text-ink-2">Open for voting. Paid on {nextPayoutLabel} in this order until that payout&apos;s budget runs out.</p>
+          </div>
+          <span className="hidden whitespace-nowrap text-sm text-ink-2 sm:block">Sorted by votes</span>
+        </div>
+        <div className="border-t border-line">
+          <ProjectRowHeader kind="active" nextPaymentTime={nextPaymentTime} />
+          {loading ? (
+            <>
+              <ProjectRowSkeleton /><ProjectRowSkeleton /><ProjectRowSkeleton />
+            </>
+          ) : activeProjects.length > 0 ? (
+            activeProjects.map((project, i) => (
+              <ProjectRow
+                key={project.id}
+                rank={i + 1}
+                project={project}
+                kind="active"
+                maxVotes={maxActiveVotes}
+                nextPaymentTime={nextPaymentTime}
+                votes={votes}
+                titles={titles}
+                onVoteSuccess={refresh}
+              />
+            ))
+          ) : (
+            <EmptyList title="No projects are being paid right now" body="Submit one, or vote for an upcoming project so it is funded when it starts." />
+          )}
         </div>
       </section>
 
-      {/* Projects Sections */}
-      <main className="max-w-7xl mx-auto px-6 pb-20">
-        {/* Active Projects */}
-        <section className="mb-20">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">Active Projects</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Currently running projects that are actively receiving funding and community support
-            </p>
+      {/* Upcoming */}
+      <section className="wrap pt-14" id="upcoming" aria-labelledby="upcoming-heading">
+        <div className="mb-5 flex items-end justify-between gap-6">
+          <div>
+            <h2 id="upcoming-heading" className="text-[24px] font-semibold leading-tight tracking-[-0.025em] lg:text-[28px]">Starting soon</h2>
+            <p className="mt-1.5 text-[15px] text-ink-2">Open for voting now. Join the payout list on their start date.</p>
           </div>
-
+          <span className="hidden whitespace-nowrap text-sm text-ink-2 sm:block">Sorted by votes</span>
+        </div>
+        <div className="border-t border-line">
+          <ProjectRowHeader kind="upcoming" nextPaymentTime={nextPaymentTime} />
           {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-            </div>
-          ) : activeProjects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeProjects.map((project) => (
-                <article
-                  key={project.id}
-                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getProposalNotice(project.id)?.muted
-                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
-                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
-                >
-                  {/* Project ID Badge */}
-                  <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
-                    #{project.id}
-                  </div>
-
-                  {/* Project Header */}
-                  <div className="mb-4">
-                    <Link href={`/projects/${project.id}`}>
-                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getProposalNotice(project.id)?.muted ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
-                        {project.title}
-                      </h3>
-                    </Link>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        Active
-                      </span>
-                      <span>{project.total_votes} KOIN votes</span>
-                    </div>
-                  </div>
-
-                  {/* Project Description */}
-                  <ProposalCardDescription id={project.id} description={project.description} />
-
-                  {/* Project Details */}
-                  <div className="space-y-3 text-sm mb-6">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Monthly Payment</span>
-                      <span className="font-medium">{project.monthly_payment} KOIN</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Duration</span>
-                      <span className="font-medium">
-                        {project.start_date.toLocaleDateString()} - {project.end_date.toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Beneficiary</span>
-                      <span className="font-mono text-xs truncate max-w-32" title={project.beneficiary}>
-                        {project.beneficiary}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Next Payment Information */}
-                  {project.calculatedPayment !== undefined && (
-                    <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-muted-foreground">Next Payment</span>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          project.paymentStatus === 'full' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                          project.paymentStatus === 'partial' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                        }`}>
-                          {project.paymentStatus === 'full' ? 'Full Payment' :
-                           project.paymentStatus === 'partial' ? 'Partial Payment' : 'No Payment'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold font-mono">
-                          {project.calculatedPayment.toFixed(8)} KOIN
-                        </span>
-                        {project.paymentStatus === 'partial' && (
-                          <span className="text-xs text-muted-foreground">
-                            {((project.calculatedPayment / parseFloat(project.monthly_payment)) * 100).toFixed(1)}% of requested
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Vote Button */}
-                  <div className="pt-4 border-t border-border">
-                    <VoteButton
-                      projectId={project.id}
-                      projectTitle={project.title}
-                      vote={project.vote}
-                      onVoteSuccess={fetchData}
-                    />
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No Active Projects</h3>
-              <p className="text-muted-foreground">There are currently no active projects to display.</p>
-            </div>
-          )}
-        </section>
-
-        {/* Upcoming Projects */}
-        <section>
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">Upcoming Projects</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Projects that will be available for community voting in the near future
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-            </div>
+            <>
+              <ProjectRowSkeleton /><ProjectRowSkeleton />
+            </>
           ) : upcomingProjects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {upcomingProjects.map((project) => (
-                <article
-                  key={project.id}
-                  className={`group relative border rounded-2xl p-6 transition-all duration-300 ${getProposalNotice(project.id)?.muted
-                    ? 'bg-card/35 border-border/50 text-muted-foreground [&>*:not([role=note])]:opacity-80'
-                    : 'bg-card border-border hover:shadow-lg hover:shadow-black/5 hover:-translate-y-1'}`}
-                >
-                  {/* Project ID Badge */}
-                  <div className="absolute top-4 right-4 bg-muted text-muted-foreground text-xs font-mono px-2 py-1 rounded-md">
-                    #{project.id}
-                  </div>
-
-                  {/* Project Header */}
-                  <div className="mb-4">
-                    <Link href={`/projects/${project.id}`}>
-                      <h3 className={`text-xl font-semibold mb-3 transition-colors line-clamp-2 cursor-pointer ${getProposalNotice(project.id)?.muted ? 'text-muted-foreground' : 'group-hover:text-primary'}`}>
-                        {project.title}
-                      </h3>
-                    </Link>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        Upcoming
-                      </span>
-                      <span>{project.total_votes} KOIN votes</span>
-                    </div>
-                  </div>
-
-                  {/* Project Description */}
-                  <ProposalCardDescription id={project.id} description={project.description} />
-
-                  {/* Project Details */}
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Monthly Payment</span>
-                      <span className="font-medium">{project.monthly_payment} KOIN</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Start Date</span>
-                      <span className="font-medium">
-                        {project.start_date.toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Beneficiary</span>
-                      <span className="font-mono text-xs truncate max-w-32" title={project.beneficiary}>
-                        {project.beneficiary}
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+            upcomingProjects.map((project, i) => (
+              <ProjectRow
+                key={project.id}
+                rank={i + 1}
+                project={project}
+                kind="upcoming"
+                maxVotes={maxUpcomingVotes}
+                nextPaymentTime={nextPaymentTime}
+                votes={votes}
+                titles={titles}
+                onVoteSuccess={refresh}
+              />
+            ))
           ) : (
-            <div className="text-center py-20">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No Upcoming Projects</h3>
-              <p className="text-muted-foreground">There are currently no upcoming projects to display.</p>
-            </div>
+            <EmptyList title="Nothing is waiting to start" body="New proposals show up here as soon as they are submitted." />
           )}
-        </section>
+        </div>
+      </section>
 
-
-      </main>
-
-
+      <HowItWorks />
     </div>
   );
 }
 
-function ProposalCardDescription({ id, description }: { id: number; description: string }) {
-  const config = getProposalNotice(id);
-  if (config) return <ProposalNotice notice={config.notice} variant="compact" />;
-  return <p className="h-[4.25rem] text-muted-foreground text-sm leading-relaxed mb-6 line-clamp-3">{description}</p>;
+function EmptyList({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="border-t border-line py-14 text-center">
+      <h3 className="text-[18px] font-semibold tracking-[-0.015em]">{title}</h3>
+      <p className="mx-auto mt-1.5 max-w-[44ch] text-[15px] text-ink-2">{body}</p>
+    </div>
+  );
 }

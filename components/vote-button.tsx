@@ -1,209 +1,84 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, type ReactNode } from 'react';
+import { Button, ButtonArrow } from '@/components/ui/button';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
-import { getFundContract, ProcessedVote } from '@/lib/utils';
-import { ThumbsUp, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { ProviderInterface, SignerInterface } from 'koilib';
+import { ProcessedVote } from '@/lib/utils';
+import { getVoteBudget, isVoteActive } from '@/lib/vote-budget';
+import { useSubmitVote } from '@/hooks/useSubmitVote';
+import { Loader2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { VoteConfirmationModal } from '@/components/vote-confirmation-modal';
+import { cn } from '@/lib/utils';
 
 interface VoteButtonProps {
   projectId: number;
   projectTitle?: string;
-  vote?: ProcessedVote;
+  /** All of the wallet's votes: this project's vote and how much is left to give. */
+  votes?: ProcessedVote[];
+  /** Project titles by id, used to name the other votes in error messages. */
+  titles?: Record<number, string>;
   onVoteSuccess?: () => void;
+  /** `row` is the compact pill in project lists; `panel` is the full-width accent pill on a project page. */
+  variant?: 'row' | 'panel';
 }
 
-export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: VoteButtonProps) {
-  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
+export function VoteButton({ projectId, projectTitle, votes = [], titles = {}, onVoteSuccess, variant = 'row' }: VoteButtonProps) {
+  const { isConnected, address } = useKondorWalletContext();
+  const submitVote = useSubmitVote();
   const [isVoting, setIsVoting] = useState(false);
   const [justVoted, setJustVoted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const now = new Date();
+  const { usedPercent: otherVotesPercent, remainingPercent } = getVoteBudget(votes, projectId);
+  const vote = votes.find(v => v.project_id === projectId);
+  const activeVote = vote && isVoteActive(vote, now) ? vote : undefined;
+  const expiredVote = vote && vote.weight > 0 && !activeVote ? vote : undefined;
 
   const handleVoteClick = () => {
     if (!isConnected || !address) {
-      toast.error('Please connect your wallet first');
+      toast.error('Connect your Kondor wallet to vote');
       return;
     }
     setIsModalOpen(true);
   };
 
   const handleVote = async (votePercentage: number) => {
-    if (!isConnected || !address) {
-      toast.error('Please connect your wallet first');
-      return;
-    }
-
     setIsVoting(true);
-
-    const submitVote = async () => {
-      // Get both provider and signer from Kondor
-      const provider = getKondorProvider() as ProviderInterface;
-      const signer = await getKondorSigner() as SignerInterface;
-
-      // Get the fund contract with both provider and signer
-      const fund = getFundContract(provider, signer);
-
-      // Create and send the vote transaction
-      const { transaction, receipt } = await fund.functions.update_vote({
-        voter: address,
-        project_id: projectId,
-        weight: votePercentage / 5, // Use the selected vote percentage
-      });
-
-      console.log('Vote transaction result:', { transaction, receipt });
-
-      // Wait for the transaction to be mined (if transaction exists)
-      if (transaction?.id) {
-        const { blockNumber } = await provider.wait(transaction.id);
-        console.log(`Vote transaction mined in block ${blockNumber}`);
-      }
-
-      return { transaction, votePercentage };
-    };
-
-    try {
-      await toast.promise(
-        submitVote(),
-        {
-          loading: 'Submitting your vote...',
-          success: (data) => `Vote of ${data.votePercentage}% submitted successfully!`,
-          error: 'Failed to submit vote. Please try again.',
-        },
-        {
-          style: {
-            minWidth: '250px',
-          },
-          success: {
-            duration: 4000,
-            icon: '🗳️',
-          },
-          error: {
-            duration: 6000,
-          },
-        }
-      );
-
-            // Show success state
-      setJustVoted(true);
-
-      // Close the modal
-      setIsModalOpen(false);
-
-      // Call the success callback to refresh data
-      if (onVoteSuccess) {
-        onVoteSuccess();
-      }
-
-      // Reset the success state after 3 seconds
-      setTimeout(() => {
-        setJustVoted(false);
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error voting:', error);
-      // Error is already handled by toast.promise
-    } finally {
-      setIsVoting(false);
-    }
+    const succeeded = await submitVote(projectId, votePercentage, votes, titles);
+    setIsVoting(false);
+    if (!succeeded) return;
+    setJustVoted(true);
+    setIsModalOpen(false);
+    onVoteSuccess?.();
+    setTimeout(() => setJustVoted(false), 3000);
   };
 
-  // Helper function to format expiration date
-  const formatExpiration = (expiration: Date) => {
-    const now = new Date();
-    const diffInHours = Math.floor((expiration.getTime() - now.getTime()) / (1000 * 60 * 60));
+  const panel = variant === 'panel';
 
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((expiration.getTime() - now.getTime()) / (1000 * 60));
-      return `${diffInMinutes}m`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours}h`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays}d`;
-    }
-  };
-
-  // Determine button state and styling
-  const getButtonState = () => {
-    if (!isConnected) {
-      return {
-        variant: "outline" as const,
-        className: "w-full h-11 rounded-xl font-medium text-sm border-border hover:border-border",
-        icon: <ThumbsUp className="w-4 h-4 mr-2" />,
-        text: "Connect Wallet to Vote",
-        disabled: true
-      };
-    }
-
-    if (isVoting) {
-      return {
-        variant: "default" as const,
-        className: "w-full h-11 rounded-xl font-medium text-sm bg-muted text-muted-foreground",
-        icon: <Loader2 className="w-4 h-4 mr-2 animate-spin" />,
-        text: "Voting...",
-        disabled: true
-      };
-    }
-
-    if (justVoted) {
-      return {
-        variant: "default" as const,
-        className: "w-full h-11 rounded-xl font-medium text-sm bg-green-500 hover:bg-green-500 text-white",
-        icon: <CheckCircle className="w-4 h-4 mr-2" />,
-        text: "Vote Submitted!",
-        disabled: true
-      };
-    }
-
-    if (vote) {
-      if (vote.expiration < now) {
-        // Expired vote - orange styling
-        return {
-          variant: "default" as const,
-          className: "w-full h-11 rounded-xl font-medium text-sm bg-orange-500 hover:bg-orange-600 text-white shadow-sm hover:shadow-md",
-          icon: <AlertTriangle className="w-4 h-4 mr-2" />,
-          text: `Expired - Renew Vote`,
-          disabled: false
-        };
-      } else {
-        // Active vote - green styling
-        return {
-          variant: "default" as const,
-          className: "w-full h-11 rounded-xl font-medium text-sm bg-green-500 hover:bg-green-600 text-white shadow-sm hover:shadow-md",
-          icon: <ThumbsUp className="w-4 h-4 mr-2" />,
-          text: `Voted (${vote.weight * 5}%) - Expires in ${formatExpiration(vote.expiration)}`,
-          disabled: false
-        };
-      }
-    }
-
-    // No vote - primary styling
-    return {
-      variant: "default" as const,
-      className: "w-full h-11 rounded-xl font-medium text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:shadow-md",
-      icon: <ThumbsUp className="w-4 h-4 mr-2" />,
-      text: "Vote for Project",
-      disabled: false
-    };
-  };
-
-  const buttonState = getButtonState();
+  let label: ReactNode;
+  if (isVoting) label = <><Loader2 className="animate-spin" />Voting</>;
+  else if (justVoted) label = <><Check />Voted</>;
+  else if (activeVote) label = panel ? 'Change your vote' : `Voted ${activeVote.weight * 5}%`;
+  else if (expiredVote) label = 'Expired · renew';
+  else label = 'Vote';
 
   return (
     <>
       <Button
-        variant={buttonState.variant}
+        variant={panel ? 'default' : 'outline'}
+        size={panel ? 'lg' : 'sm'}
         onClick={handleVoteClick}
-        disabled={buttonState.disabled}
-        className={buttonState.className}
+        disabled={isVoting}
+        className={cn(
+          panel ? 'w-full' : 'min-w-[88px]',
+          !panel && activeVote && 'border-accent bg-accent-soft hover:border-accent',
+          !panel && justVoted && 'border-ink bg-ink text-paper hover:border-ink',
+        )}
       >
-        {buttonState.icon}
-        {buttonState.text}
+        {label}
+        {panel && !isVoting && <ButtonArrow />}
       </Button>
 
       <VoteConfirmationModal
@@ -212,6 +87,9 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
         onConfirm={handleVote}
         projectId={projectId}
         projectTitle={projectTitle}
+        currentPercentage={activeVote ? activeVote.weight * 5 : 0}
+        otherVotesPercent={otherVotesPercent}
+        remainingPercent={remainingPercent}
         isLoading={isVoting}
       />
     </>

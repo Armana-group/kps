@@ -37,10 +37,10 @@ function FloatingInput({ label, error, className, ...props }: FloatingInputProps
       <input
         {...props}
         className={cn(
-          "w-full h-14 px-4 pt-6 pb-2 text-base bg-background border-2 rounded-xl transition-all duration-200 outline-none peer",
+          "w-full h-14 px-4 pt-6 pb-2 text-base bg-paper border rounded-2xl transition-colors duration-150 outline-none peer",
           error
-            ? "border-red-500 focus:border-red-500"
-            : "border-border focus:border-primary hover:border-primary/50",
+            ? "border-danger focus:border-danger"
+            : "border-line-strong focus:border-ink hover:border-ink",
           // Hide spinner arrows for number inputs
           props.type === "number" && "[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]",
           className
@@ -54,14 +54,14 @@ function FloatingInput({ label, error, className, ...props }: FloatingInputProps
         className={cn(
           "absolute left-4 transition-all duration-200 pointer-events-none",
           isLabelFloating
-            ? "top-2 text-xs font-medium text-foreground"
-            : "top-1/2 -translate-y-1/2 text-base text-muted-foreground"
+            ? "top-2 text-xs font-medium text-ink-2"
+            : "top-1/2 -translate-y-1/2 text-base text-ink-2"
         )}
       >
         {label}
       </label>
       {error && (
-        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+        <p className="text-sm text-danger mt-1.5 flex items-center gap-1">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
@@ -108,10 +108,10 @@ function FloatingTextarea({ label, error, className, ...props }: FloatingTextare
       <textarea
         {...props}
         className={cn(
-          "w-full min-h-[120px] px-4 pt-6 pb-2 text-base bg-background border-2 rounded-xl transition-all duration-200 outline-none resize-none",
+          "w-full min-h-[120px] px-4 pt-6 pb-2 text-base bg-paper border rounded-2xl transition-colors duration-150 outline-none resize-none",
           error
-            ? "border-red-500 focus:border-red-500"
-            : "border-border focus:border-primary hover:border-primary/50",
+            ? "border-danger focus:border-danger"
+            : "border-line-strong focus:border-ink hover:border-ink",
           className
         )}
         onFocus={handleFocus}
@@ -123,14 +123,14 @@ function FloatingTextarea({ label, error, className, ...props }: FloatingTextare
         className={cn(
           "absolute left-4 transition-all duration-200 pointer-events-none",
           isLabelFloating
-            ? "top-2 text-xs font-medium text-foreground"
-            : "top-6 text-base text-muted-foreground"
+            ? "top-2 text-xs font-medium text-ink-2"
+            : "top-6 text-base text-ink-2"
         )}
       >
         {label}
       </label>
       {error && (
-        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+        <p className="text-sm text-danger mt-1.5 flex items-center gap-1">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>

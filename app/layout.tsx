@@ -1,27 +1,28 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Hanken_Grotesk, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { KondorWalletProvider } from "@/contexts/KondorWalletContext";
+import { HeaderSlotProvider } from "@/components/header-slot";
 import { Navigation } from "@/components/navigation";
+import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "react-hot-toast";
 
-// SF Pro Display is Apple's signature font, fallback to Inter
-const sfProDisplay = Inter({
-  variable: "--font-display",
+const hanken = Hanken_Grotesk({
+  variable: "--font-hanken",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const inter = Inter({
-  variable: "--font-sans",
+const dmMono = DM_Mono({
+  variable: "--font-dm-mono",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
-  title: "Koinos Proposals",
-  description: "Governance proposals for the Koinos blockchain",
+  title: "Koinos Fund System",
+  description: "The on-chain fund where KOIN holders vote on which community projects get paid each month.",
 };
 
 export default function RootLayout({
@@ -31,46 +32,38 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${sfProDisplay.variable} ${inter.variable} font-sans antialiased`}
-      >
-                <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-        >
+      <body className={`${hanken.variable} ${dmMono.variable} font-sans antialiased`}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <KondorWalletProvider>
-            <Navigation />
-            {children}
+            <HeaderSlotProvider>
+              <Navigation />
+              <div className="min-h-[calc(100vh-76px)] flex flex-col">
+                <div className="flex-1">{children}</div>
+                <SiteFooter />
+              </div>
+            </HeaderSlotProvider>
             <Toaster
               position="top-right"
-              reverseOrder={false}
               gutter={8}
-              containerClassName=""
-              containerStyle={{}}
               toastOptions={{
-                // Default options for all toasts
-                className: '',
                 duration: 4000,
                 style: {
-                  background: 'hsl(var(--card))',
-                  color: 'hsl(var(--card-foreground))',
-                  border: '1px solid hsl(var(--border))',
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--line-strong)",
+                  borderRadius: "999px",
+                  padding: "10px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  boxShadow: "0 16px 32px -20px rgba(0,0,0,.3)",
                 },
-                // Default options for specific types
                 success: {
                   duration: 3000,
-                  iconTheme: {
-                    primary: 'hsl(var(--primary))',
-                    secondary: 'hsl(var(--primary-foreground))',
-                  },
+                  iconTheme: { primary: "var(--ink)", secondary: "var(--paper)" },
                 },
                 error: {
                   duration: 5000,
-                  iconTheme: {
-                    primary: 'hsl(var(--destructive))',
-                    secondary: 'hsl(var(--destructive-foreground))',
-                  },
+                  iconTheme: { primary: "var(--danger)", secondary: "var(--paper)" },
                 },
               }}
             />

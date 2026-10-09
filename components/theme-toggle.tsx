@@ -4,45 +4,21 @@ import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
-import { Button } from "@/components/ui/button"
-
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
 
-  const handleThemeChange = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    
-    // Add transition class to body
-    document.body.classList.add('theme-transitioning')
-    
-    // Set the pseudo-element background to the new theme color
-    const newBgColor = newTheme === 'dark' 
-      ? 'rgb(0, 0, 0)' 
-      : 'rgb(255, 255, 255)'
-    
-    document.body.style.setProperty('--transition-bg', newBgColor)
-    
-    // Start the slide animation
-    setTimeout(() => {
-      setTheme(newTheme)
-    }, 300)
-    
-    // Clean up after animation
-    setTimeout(() => {
-      document.body.classList.remove('theme-transitioning')
-    }, 800)
-  }
+  const dark = mounted && resolvedTheme === "dark"
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={handleThemeChange}
-      className="h-10 w-10 rounded-xl hover:bg-secondary/50 transition-all duration-200 hover:scale-105"
+    <button
+      type="button"
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      className="grid size-10 shrink-0 place-items-center rounded-full border border-line-strong text-ink transition-colors hover:border-ink"
     >
-      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all duration-500 ease-in-out dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all duration-500 ease-in-out dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+      {dark ? <Moon className="size-4" strokeWidth={1.8} /> : <Sun className="size-4" strokeWidth={1.8} />}
+    </button>
   )
-} 
+}

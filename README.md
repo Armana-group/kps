@@ -80,3 +80,7 @@ Both views use the shared `ProposalNotice` component. The homepage banner displa
 Direct `/projects/<id>` pages remain accessible even when their cards are hidden. Unlisted proposals have no notice or muted styling. Remove an entry to clear its notice and restore ordinary visibility; an empty array disables all notices. Configuration changes require rebuilding and deploying the frontend.
 
 These are frontend notices, not an on-chain status or automatic vote removal. Listed proposals still participate in the fund's payment allocation, so the home page calculates payment estimates before hiding cards. Confirm the author's request before publishing an author-attributed notice. Proposals 8 and 9 are included at their author's request.
+
+## Proposal detail links
+
+The detail description recognizes HTTP, HTTPS, and `www.` URLs as clickable links that open in a new tab. Plain text, line breaks, and surrounding punctuation are preserved; HTML in descriptions is rendered as text. Long URLs wrap within the description on small screens using `overflow-wrap: anywhere`.

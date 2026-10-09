@@ -84,7 +84,7 @@ export function DatePicker({
           variant="outline"
           onClick={handleButtonClick}
           className={cn(
-            "w-full h-14 px-4 pt-6 pb-2 text-base bg-background border-2 rounded-xl transition-all duration-200 justify-start text-left font-normal hover:bg-background",
+            "w-full h-14 px-4 pt-6 pb-2 text-base bg-paper border rounded-2xl transition-colors duration-150 justify-start text-left font-normal hover:bg-paper",
             error
               ? "border-red-500 focus:border-red-500"
               : "border-border focus:border-primary hover:border-primary/50",
@@ -102,8 +102,8 @@ export function DatePicker({
           className={cn(
             "absolute left-4 transition-all duration-200 pointer-events-none",
             isLabelFloating
-              ? "top-2 text-xs font-medium text-foreground"
-              : "top-1/2 -translate-y-1/2 text-base text-muted-foreground"
+              ? "top-2 text-xs font-medium text-ink-2"
+              : "top-1/2 -translate-y-1/2 text-base text-ink-2"
           )}
         >
           {label}
@@ -111,7 +111,7 @@ export function DatePicker({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 z-50 mt-2 w-auto min-w-[280px] bg-popover/95 backdrop-blur-md border rounded-xl shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
+        <div className="absolute top-full left-0 z-50 mt-2 w-auto min-w-[280px] bg-paper border border-line rounded-[20px] shadow-[0_24px_48px_-24px_rgba(0,0,0,.25)] animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -143,7 +143,7 @@ export function DatePicker({
       )}
 
       {error && (
-        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+        <p className="text-sm text-danger mt-1.5 flex items-center gap-1">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>

@@ -9,20 +9,19 @@ export function ProposalNotice({ notice, variant = 'detail' }: {
 
   if (variant === 'compact') {
     return (
-      <div role="note" aria-label={notice.title} title={`${notice.title}: ${text}`} className="mb-6 h-[4.25rem] overflow-hidden rounded-lg border border-red-500/70 bg-red-50 px-3 py-2 text-red-900 dark:bg-red-950/60 dark:text-red-200">
-        <p className="text-xs leading-4 line-clamp-3 break-words">
-          <strong>{notice.title}</strong> — {text}
-        </p>
-      </div>
+      <p role="note" aria-label={notice.title} title={`${notice.title}: ${text}`} className="mt-2.5 flex items-start gap-2 text-[13px] font-medium leading-snug text-danger">
+        <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
+        <span className="line-clamp-2">{text}</span>
+      </p>
     );
   }
 
   return (
-    <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/50 bg-red-50 p-4 text-red-900 dark:bg-red-950/40 dark:text-red-200">
-      <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
-      <div className="min-w-0 space-y-2">
-        <h2 className="font-semibold break-words">{notice.title}</h2>
-        <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
+    <div role="alert" className="mb-8 flex items-start gap-3 rounded-2xl border border-danger/40 bg-danger/5 p-4 text-danger">
+      <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0" strokeWidth={1.8} />
+      <div className="min-w-0 space-y-1">
+        <h2 className="font-semibold">{notice.title}</h2>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{text}</p>
       </div>
     </div>
   );

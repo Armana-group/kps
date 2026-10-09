@@ -3,26 +3,17 @@
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
 import { Button } from '@/components/ui/button';
 import { UserMenu } from '@/components/user-menu';
-import { Wallet, ExternalLink } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export function WalletConnect() {
-  const {
-    isConnected,
-    isKondorInstalled,
-    isConnecting,
-    error,
-    connect,
-  } = useKondorWalletContext();
+  const { isConnected, isKondorInstalled, isConnecting, connect } = useKondorWalletContext();
 
   if (!isKondorInstalled) {
     return (
-      <Button
-        variant="outline"
-        className="h-10 px-4 rounded-xl font-medium text-sm border-border hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
-        onClick={() => window.open('https://chrome.google.com/webstore/detail/kondor/ghipkefkpgkladckmlmdnadmcchefhjl', '_blank')}
-      >
-        <ExternalLink className="w-4 h-4 mr-2" />
-        Install Kondor
+      <Button variant="outline" size="sm" className="h-10" asChild>
+        <a href="https://chrome.google.com/webstore/detail/kondor/ghipkefkpgkladckmlmdnadmcchefhjl" target="_blank" rel="noreferrer">
+          Install Kondor
+        </a>
       </Button>
     );
   }
@@ -32,22 +23,9 @@ export function WalletConnect() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {error && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <div className="w-2 h-2 bg-destructive rounded-full flex-shrink-0"></div>
-          <span className="text-sm text-destructive">{error}</span>
-        </div>
-      )}
-      <Button
-        onClick={connect}
-        disabled={isConnecting}
-        variant="ghost"
-        size="icon"
-        className="h-10 w-10 rounded-xl hover:bg-primary/10 transition-all duration-200"
-      >
-        <Wallet className="w-4 h-4" />
-      </Button>
-    </div>
+    <Button variant="secondary" size="sm" className="h-10" onClick={connect} disabled={isConnecting}>
+      {isConnecting && <Loader2 className="animate-spin" />}
+      Connect wallet
+    </Button>
   );
 }
