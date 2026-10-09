@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { isProposalHidden } from "@/lib/proposal-visibility";
 import { YourVotes } from "@/components/your-votes";
@@ -10,6 +10,7 @@ import { HowItWorks } from "@/components/how-it-works";
 import { Button, ButtonArrow } from "@/components/ui/button";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { withRetry } from "@/lib/retry";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 
 // Interface for processed project data
@@ -91,195 +92,214 @@ export default function Home() {
     return updatedProjects;
   }, []);
 
-  const fetchFundData = useCallback(async (): Promise<Date | null> => {
-    // fund balance
-    const koin = getKoinContract();
-    const { result: balanceResult } = await koin.functions.balanceOf<{ value: string }>({
-      owner: FUND_ADDRESS,
-    });
-    const balance = parseInt(balanceResult?.value || "0") / 1e8;
-    setFundBalance(balance);
+  // Each load gets an id; only the latest one may update the page, so a slow
+  // older load can't overwrite newer results.
+  const projectsLoadId = useRef(0);
+  const votesLoadId = useRef(0);
 
-    // fund global vars
-    const fund = getFundContract();
-    const { result: globalVarsResult } = await fund.functions.get_global_vars<{
-      total_projects: number;
-      total_active_projects: number;
-      payment_times: string[];
-    }>();
-    const nextPaymentTime = globalVarsResult?.payment_times[0];
-    const nextPaymentTimeDate = nextPaymentTime ? new Date(parseInt(nextPaymentTime)) : null;
-    setNextPaymentTime(nextPaymentTimeDate);
-    return nextPaymentTimeDate;
-  }, []);
-
-  const fetchVotes = useCallback(async (): Promise<ProcessedVote[]> => {
-    if (!address) return [];
-    const fund = getFundContract();
-    const votes = await fund.functions.get_user_votes<{ votes: Vote[] }>({
-      voter: address,
-    });
-
-    const processedVotes = (votes?.result?.votes || []).map(vote => ({
-      ...vote,
-      expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
-    }));
-
-    setVotes(processedVotes);
-    return processedVotes;
-  }, [address]);
-
-  const fetchProjects = useCallback(async (currentVotes: ProcessedVote[], nextPaymentTime: Date | null) => {
+  // Fund balance, payout time and projects: loaded once, and again after a vote.
+  // Votes load separately, so connecting a wallet doesn't reload all of this.
+  const loadProjects = useCallback(async () => {
+    const loadId = ++projectsLoadId.current;
     setLoading(true);
-    const fund = getFundContract();
     console.log("fetching projects");
 
     try {
-      const now = new Date();
+      await withRetry(async () => {
+        const fund = getFundContract();
+        const now = new Date();
 
-      // Fetch active projects - 3 pages
-      const allActiveProjects: Project[] = [];
-      let activeStart = pageStart;
-      const activePagesToFetch = 3;
+        // fund balance
+        const koin = getKoinContract();
+        const { result: balanceResult } = await koin.functions.balanceOf<{ value: string }>({
+          owner: FUND_ADDRESS,
+        });
+        const balance = parseInt(balanceResult?.value || "0") / 1e8;
 
-      for (let page = 0; page < activePagesToFetch; page++) {
-        const activeResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
-          status: ProjectStatus.Active,
-          order_by: OrderBy.Votes,
-          limit: pageSize,
-          start: activeStart,
-          descending: true,
+        // fund global vars
+        const { result: globalVarsResult } = await fund.functions.get_global_vars<{
+          total_projects: number;
+          total_active_projects: number;
+          payment_times: string[];
+        }>();
+        const nextPaymentTimestamp = globalVarsResult?.payment_times[0];
+        const nextPaymentTime = nextPaymentTimestamp ? new Date(parseInt(nextPaymentTimestamp)) : null;
+
+        // Fetch active projects - 3 pages
+        const allActiveProjects: Project[] = [];
+        let activeStart = pageStart;
+        const activePagesToFetch = 3;
+
+        for (let page = 0; page < activePagesToFetch; page++) {
+          const activeResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
+            status: ProjectStatus.Active,
+            order_by: OrderBy.Votes,
+            limit: pageSize,
+            start: activeStart,
+            descending: true,
+          });
+
+          const projects = activeResult?.result?.projects || [];
+          allActiveProjects.push(...projects);
+
+          // Use start_next_page for the next iteration, or break if there's no next page
+          const nextPageStart = activeResult?.result?.start_next_page;
+          if (!nextPageStart || projects.length === 0) {
+            break; // No more pages available
+          }
+          activeStart = nextPageStart;
+        }
+
+        const processedActiveProjects = allActiveProjects.map(project => ({
+          ...project,
+          monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
+          start_date: new Date(parseInt(project.start_date)),
+          end_date: new Date(parseInt(project.end_date)),
+          total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
+        }));
+
+        // Fetch upcoming projects - 3 pages
+        const allUpcomingProjects: Project[] = [];
+        let upcomingStart = pageStart;
+        const upcomingPagesToFetch = 3;
+
+        for (let page = 0; page < upcomingPagesToFetch; page++) {
+          const upcomingResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
+            status: ProjectStatus.Upcoming,
+            order_by: OrderBy.Votes,
+            limit: pageSize,
+            start: upcomingStart,
+            descending: true,
+          });
+
+          const projects = upcomingResult?.result?.projects || [];
+          allUpcomingProjects.push(...projects);
+
+          // Use start_next_page for the next iteration, or break if there's no next page
+          const nextPageStart = upcomingResult?.result?.start_next_page;
+          if (!nextPageStart || projects.length === 0) {
+            break; // No more pages available
+          }
+          upcomingStart = nextPageStart;
+        }
+
+        const processedUpcomingProjects = allUpcomingProjects.map(project => ({
+          ...project,
+          monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
+          start_date: new Date(parseInt(project.start_date)),
+          end_date: new Date(parseInt(project.end_date)),
+          total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
+        }));
+
+        // Filter and move projects based on dates
+        // Remove active projects that end before next payment
+        const filteredActiveProjects = processedActiveProjects.filter(project => {
+          if (!nextPaymentTime) return true; // Keep all if no next payment time
+          return project.end_date >= nextPaymentTime;
         });
 
-        const projects = activeResult?.result?.projects || [];
-        allActiveProjects.push(...projects);
+        // Move upcoming projects that have started to active list
+        const projectsToMoveToActive = processedUpcomingProjects.filter(project => 
+          project.start_date <= now
+        );
+        const remainingUpcomingProjects = processedUpcomingProjects.filter(project => 
+          project.start_date > now
+        );
 
-        // Use start_next_page for the next iteration, or break if there's no next page
-        const nextPageStart = activeResult?.result?.start_next_page;
-        if (!nextPageStart || projects.length === 0) {
-          break; // No more pages available
-        }
-        activeStart = nextPageStart;
-      }
+        // Combine moved projects with active projects
+        const finalActiveProjects = [...filteredActiveProjects, ...projectsToMoveToActive];
 
-      const processedActiveProjects = allActiveProjects.map(project => ({
-        ...project,
-        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(project.start_date)),
-        end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: currentVotes.find(v => v.project_id === project.id),
-      }));
+        // Sort active projects by votes (highest first)
+        finalActiveProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
 
-      // Fetch upcoming projects - 3 pages
-      const allUpcomingProjects: Project[] = [];
-      let upcomingStart = pageStart;
-      const upcomingPagesToFetch = 3;
+        if (loadId !== projectsLoadId.current) return;
 
-      for (let page = 0; page < upcomingPagesToFetch; page++) {
-        const upcomingResult = await fund.functions.get_projects<{ projects: Project[]; start_next_page: string; }>({
-          status: ProjectStatus.Upcoming,
-          order_by: OrderBy.Votes,
-          limit: pageSize,
-          start: upcomingStart,
-          descending: true,
-        });
-
-        const projects = upcomingResult?.result?.projects || [];
-        allUpcomingProjects.push(...projects);
-
-        // Use start_next_page for the next iteration, or break if there's no next page
-        const nextPageStart = upcomingResult?.result?.start_next_page;
-        if (!nextPageStart || projects.length === 0) {
-          break; // No more pages available
-        }
-        upcomingStart = nextPageStart;
-      }
-
-      const processedUpcomingProjects = allUpcomingProjects.map(project => ({
-        ...project,
-        monthly_payment: (parseInt(project.monthly_payment) / 1e8).toFixed(8),
-        start_date: new Date(parseInt(project.start_date)),
-        end_date: new Date(parseInt(project.end_date)),
-        total_votes: (project.votes.reduce((acc, vote) => acc + parseInt(vote), 0) / 20e8).toFixed(8),
-        vote: currentVotes.find(v => v.project_id === project.id),
-      }));
-
-      // Filter and move projects based on dates
-      // Remove active projects that end before next payment
-      const filteredActiveProjects = processedActiveProjects.filter(project => {
-        if (!nextPaymentTime) return true; // Keep all if no next payment time
-        return project.end_date >= nextPaymentTime;
+        // Calculate payment distribution with the balance fetched above
+        const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, balance);
+        setFundBalance(balance);
+        setNextPaymentTime(nextPaymentTime);
+        // Hide cards after allocation: hidden proposals still compete for funds on-chain.
+        setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id, project.votes)));
+        setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id, project.votes)));
       });
-
-      // Move upcoming projects that have started to active list
-      const projectsToMoveToActive = processedUpcomingProjects.filter(project => 
-        project.start_date <= now
-      );
-      const remainingUpcomingProjects = processedUpcomingProjects.filter(project => 
-        project.start_date > now
-      );
-
-      // Combine moved projects with active projects
-      const finalActiveProjects = [...filteredActiveProjects, ...projectsToMoveToActive];
-
-      // Sort active projects by votes (highest first)
-      finalActiveProjects.sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
-
-      // Calculate payment distribution for active projects
-      const projectsWithPayments = calculatePaymentDistribution(finalActiveProjects, fundBalance || 0);
-      // Hide cards after allocation: hidden proposals still compete for funds on-chain.
-      setActiveProjects(projectsWithPayments.filter(project => !isProposalHidden(project.id, project.votes)));
-
-      setUpcomingProjects(remainingUpcomingProjects.filter(project => !isProposalHidden(project.id, project.votes)));
     } catch (error) {
+      if (loadId !== projectsLoadId.current) return;
       console.error("Error fetching projects:", error);
       toast.error("Failed to load projects. Please try again.");
     } finally {
-      setLoading(false);
+      if (loadId === projectsLoadId.current) setLoading(false);
     }
-  }, [pageSize, pageStart, setActiveProjects, setUpcomingProjects, calculatePaymentDistribution, fundBalance]);
+  }, [pageSize, pageStart, calculatePaymentDistribution]);
 
-  const fetchData = useCallback(async () => {
-    const currentVotes = await fetchVotes();
-    const nextPaymentTime = await fetchFundData(); // Fetch fund balance first
-    await fetchProjects(currentVotes, nextPaymentTime); // Then calculate payments with the balance
-  }, [fetchVotes, fetchProjects, fetchFundData]);
+  // The connected wallet's votes: loaded when the wallet changes, and after a vote.
+  const loadVotes = useCallback(async () => {
+    const loadId = ++votesLoadId.current;
+    if (!address) {
+      setVotes([]);
+      return;
+    }
+
+    try {
+      const processedVotes = await withRetry(async () => {
+        const fund = getFundContract();
+        const votes = await fund.functions.get_user_votes<{ votes: Vote[] }>({
+          voter: address,
+        });
+        return (votes?.result?.votes || []).map(vote => ({
+          ...vote,
+          expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
+        }));
+      });
+      if (loadId === votesLoadId.current) setVotes(processedVotes);
+    } catch (error) {
+      console.error("Error fetching votes:", error);
+    }
+  }, [address]);
+
+  const refresh = useCallback(() => {
+    loadVotes();
+    loadProjects();
+  }, [loadVotes, loadProjects]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadProjects();
+  }, [loadProjects]);
 
-  // Titles for every project the wallet voted on, including past and hidden ones
   useEffect(() => {
-    const missingIds = votes.map(vote => vote.project_id).filter(id => !(id in voteTitles));
+    loadVotes();
+  }, [loadVotes]);
+
+  // Titles for the wallet's votes. Listed projects already have theirs; the rest
+  // (past or hidden projects) are fetched one at a time to stay under the RPC's burst limit.
+  const listedTitles: Record<number, string> = Object.fromEntries(
+    [...activeProjects, ...upcomingProjects].map(project => [project.id, project.title]),
+  );
+  const titles = { ...listedTitles, ...voteTitles };
+
+  useEffect(() => {
+    if (loading) return;
+    const missingIds = votes.map(vote => vote.project_id).filter(id => !(id in listedTitles) && !(id in voteTitles));
     if (missingIds.length === 0) return;
-    const fund = getFundContract();
-    Promise.all(missingIds.map(async id => {
-      const { result } = await fund.functions.get_project<Project>({ project_id: id });
-      return [id, result?.title ?? `Project #${id}`] as const;
-    }))
-      .then(entries => setVoteTitles(prev => ({ ...prev, ...Object.fromEntries(entries) })))
-      .catch(error => console.error("Error fetching voted project titles:", error));
-  }, [votes, voteTitles]);
 
-  useEffect(() => {
-    console.log("fetching votes, address:", address);
-    fetchVotes().then((processedVotes) => {
-      console.log("votes fetched");
-      if (!processedVotes) return;
+    let cancelled = false;
+    (async () => {
+      const fund = getFundContract();
+      const found: Record<number, string> = {};
+      for (const id of missingIds) {
+        const { result } = await fund.functions.get_project<Project>({ project_id: id });
+        found[id] = result?.title ?? `Project #${id}`;
+      }
+      if (!cancelled) setVoteTitles(prev => ({ ...prev, ...found }));
+    })().catch(error => console.error("Error fetching voted project titles:", error));
+    return () => { cancelled = true; };
+    // listedTitles is derived from activeProjects/upcomingProjects
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, votes, voteTitles, activeProjects, upcomingProjects]);
 
-      setActiveProjects(prevActive => prevActive.map(project => ({
-        ...project,
-        vote: processedVotes.find(v => v.project_id === project.id),
-      })));
-
-      setUpcomingProjects(prevUpcoming => prevUpcoming.map(project => ({
-        ...project,
-        vote: processedVotes.find(v => v.project_id === project.id),
-      })));
-    });
-  }, [address, fetchVotes, setActiveProjects, setUpcomingProjects]);
+  const withVote = (project: ProcessedProject) => ({
+    ...project,
+    vote: votes.find(vote => vote.project_id === project.id),
+  });
 
 
 
@@ -291,7 +311,7 @@ export default function Home() {
     <div>
       {address && (
         <HeaderSlot>
-          <YourVotes votes={votes} titles={voteTitles} onChange={fetchData} />
+          <YourVotes votes={votes} titles={titles} onChange={refresh} />
         </HeaderSlot>
       )}
 
@@ -299,7 +319,7 @@ export default function Home() {
       <section className="wrap grid items-center gap-10 pb-16 pt-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-16 lg:pb-20 lg:pt-16">
         <div>
           <h1 className="max-w-[15ch] text-[40px] font-bold leading-[1.02] tracking-[-0.035em] text-balance lg:text-[56px]">
-            The Koinos community decides what gets built.
+            The Koinos community decides what gets funded.
           </h1>
           <p className="mt-6 max-w-[44ch] text-[18px] leading-normal text-ink-2">
             Every month the fund pays the projects with the most support. Vote with the KOIN you already hold. Nothing is spent and nothing is locked.
@@ -346,13 +366,13 @@ export default function Home() {
               <ProjectRow
                 key={project.id}
                 rank={i + 1}
-                project={project}
+                project={withVote(project)}
                 kind="active"
                 maxVotes={maxActiveVotes}
                 nextPaymentTime={nextPaymentTime}
                 votes={votes}
-                titles={voteTitles}
-                onVoteSuccess={fetchData}
+                titles={titles}
+                onVoteSuccess={refresh}
               />
             ))
           ) : (
@@ -381,13 +401,13 @@ export default function Home() {
               <ProjectRow
                 key={project.id}
                 rank={i + 1}
-                project={project}
+                project={withVote(project)}
                 kind="upcoming"
                 maxVotes={maxUpcomingVotes}
                 nextPaymentTime={nextPaymentTime}
                 votes={votes}
-                titles={voteTitles}
-                onVoteSuccess={fetchData}
+                titles={titles}
+                onVoteSuccess={refresh}
               />
             ))
           ) : (
