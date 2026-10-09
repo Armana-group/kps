@@ -69,7 +69,7 @@ Each KOIN and each VHP in your wallet counts as one vote. You can give all of it
 
 ### Your votes add up to 100%
 
-All your votes together can't go over 100%. If you gave 50% to one project, you have 50% left for the others. Lowering or removing a vote frees that share up again.
+All your votes together can't go over 100%. If you gave 50% to one project, you have 50% left for the others. This includes expired votes and votes on finished projects: they keep their share until you remove them. Lowering or removing a vote frees that share up again.
 
 ### Seeing and removing your votes
 
@@ -77,7 +77,7 @@ Connect your wallet and click "Your votes" at the top right of the main page. It
 
 ### Vote duration
 
-Votes expire after about 6 months. An expired vote no longer counts. You can renew it, or change its percentage, at any time.
+Votes expire after about 6 months. An expired vote no longer counts toward its project, but it still uses its share of your 100% until you remove it. You can renew it, change its percentage, or remove it at any time.
 
 ### Tokens are not locked
 
@@ -151,7 +151,7 @@ Payments are made monthly, at the next payment time shown on the main page.
 
 ### Why does it say my votes exceeded 100%?
 
-You already have votes on other projects, possibly from months ago, and the new vote would take your total over 100%. Click "Your votes" at the top right of the main page, then lower or remove one of them, or vote with a smaller percentage.
+You already have votes on other projects, possibly from months ago, and the new vote would take your total over 100%. Expired votes and votes on finished projects count too, until you remove them. Click "Your votes" at the top right of the main page, then lower or remove one of them, or vote with a smaller percentage.
 
 ### How do I see or remove my votes?
 
@@ -167,7 +167,7 @@ Yes, at any time. A new vote on a project replaces your previous vote on that pr
 
 ### What happens if my vote expires?
 
-It stops counting toward the project's total. Vote for the project again to renew it.
+It stops counting toward the project's total, but it still uses its share of your 100%. Vote for the project again to renew it, or remove it to free that share.
 
 ### Why was my project rejected?
 
@@ -199,4 +199,4 @@ Main contract methods:
 - `get_project({ project_id })` and `get_projects({ status, order_by, start, limit, descending })` read proposals. Status 0 is upcoming, 1 is active, 2 is past.
 - `get_global_vars()` returns project counts and upcoming `payment_times`.
 
-If `update_vote` would push a wallet's votes past 100%, the contract rejects it with an error like "votes have exceeded 100% by 50%". The fix is to lower another vote first.
+The contract keeps a running total of each wallet's vote weights that only drops when a vote is set to 0, so expired votes and votes on finished projects still count toward the limit. If `update_vote` would push that total past 100%, the contract rejects it with an error like "votes have exceeded 100% by 50%". The fix is to lower another vote first.

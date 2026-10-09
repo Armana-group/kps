@@ -194,7 +194,7 @@ export default function ProjectDetailPage() {
             )}
             {expiredVote && (
               <div className="mt-6 rounded-2xl bg-panel-strong px-4 py-3.5 text-sm leading-snug text-ink-2">
-                Your {expiredVote.weight * 5}% vote expired {formatDate(expiredVote.expiration)} and no longer counts. Vote again to renew it.
+                Your {expiredVote.weight * 5}% vote expired {formatDate(expiredVote.expiration)}. It no longer counts for this project but still uses {expiredVote.weight * 5}% of your share. Vote again to renew it, or remove it.
               </div>
             )}
 

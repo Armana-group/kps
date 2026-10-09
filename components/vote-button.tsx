@@ -31,7 +31,7 @@ export function VoteButton({ projectId, projectTitle, votes = [], titles = {}, o
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const now = new Date();
-  const { usedPercent: otherVotesPercent, remainingPercent } = getVoteBudget(votes, now, projectId);
+  const { usedPercent: otherVotesPercent, remainingPercent } = getVoteBudget(votes, projectId);
   const vote = votes.find(v => v.project_id === projectId);
   const activeVote = vote && isVoteActive(vote, now) ? vote : undefined;
   const expiredVote = vote && vote.weight > 0 && !activeVote ? vote : undefined;

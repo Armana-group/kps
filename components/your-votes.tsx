@@ -27,7 +27,7 @@ export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
   const [removingId, setRemovingId] = useState<number | null>(null);
 
   const now = new Date();
-  const { usedPercent, remainingPercent } = getVoteBudget(votes, now);
+  const { usedPercent, remainingPercent } = getVoteBudget(votes);
   const listed = votes
     .filter(vote => vote.weight > 0)
     .sort((a, b) => Number(isVoteActive(b, now)) - Number(isVoteActive(a, now)) || b.weight - a.weight);
@@ -80,10 +80,10 @@ export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
                     <p className="text-[13px] text-ink-2">
                       {active
                         ? `Expires ${formatDate(vote.expiration)}`
-                        : `Expired ${formatDate(vote.expiration)}, no longer counts`}
+                        : `Expired ${formatDate(vote.expiration)}. Still uses ${vote.weight * 5}% until removed`}
                     </p>
                   </div>
-                  <span className={cn('text-[15px] tabular-nums', active ? 'font-semibold' : 'text-ink-3 line-through')}>
+                  <span className={cn('text-[15px] font-semibold tabular-nums', !active && 'text-ink-2')}>
                     {vote.weight * 5}%
                   </span>
                   <button
