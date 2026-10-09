@@ -13,6 +13,7 @@ import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
 import { ProposalNotice } from "@/components/proposal-notice";
 import { getProposalNotice } from "@/lib/proposal-visibility";
+import { splitTextLinks } from "@/lib/text-links";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -157,7 +158,7 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="mt-10 max-w-[62ch] space-y-4 text-[17px] leading-[1.6]">
-            {paragraphs.map((text, i) => <p key={i} className="whitespace-pre-wrap break-words">{linkify(text)}</p>)}
+            {paragraphs.map((text, i) => <p key={i} className="whitespace-pre-wrap [overflow-wrap:anywhere]">{linkify(text)}</p>)}
           </div>
 
           <dl className="mt-12 border-t border-line text-[15px]">
@@ -236,11 +237,11 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Turns bare http(s) URLs in proposal text into links. */
+/** Turns http(s) and www. URLs in proposal text into links, leaving trailing punctuation outside. */
 function linkify(text: string): ReactNode[] {
-  return text.split(/(https?:\/\/[^\s)]+)/g).map((part, i) =>
-    /^https?:\/\//.test(part)
-      ? <a key={i} href={part} target="_blank" rel="noreferrer" className="underline underline-offset-[3px] decoration-1 break-all">{part.replace(/^https?:\/\//, '')}</a>
-      : part
+  return splitTextLinks(text).map((part, i) =>
+    part.href
+      ? <a key={i} href={part.href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-[3px] decoration-1">{part.text.replace(/^https?:\/\//, '')}</a>
+      : part.text
   );
 }
