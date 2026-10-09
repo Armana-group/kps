@@ -1,69 +1,51 @@
 "use client";
 
-import { useState } from "react";
-import { FileText, Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { DocsSection } from "@/lib/docs-toc";
+import { cn } from "@/lib/utils";
 
+// Contents list. A sticky column on desktop, a horizontal strip on phones.
 export function DocsSidebar({ sections }: { sections: DocsSection[] }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [current, setCurrent] = useState<string | null>(null);
+
+  // Highlight the section that is on screen
+  useEffect(() => {
+    const headings = sections
+      .map((s) => document.getElementById(s.id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (headings.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setCurrent(visible[0].target.id);
+      },
+      { rootMargin: "-96px 0px -70% 0px" },
+    );
+    headings.forEach((h) => observer.observe(h));
+    return () => observer.disconnect();
+  }, [sections]);
 
   return (
-    <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="lg:hidden fixed top-20 left-4 z-50 p-2 rounded-md bg-background/95 backdrop-blur border border-border/50 hover:bg-accent/50 transition-colors"
-        aria-label="Open contents"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Table of Contents */}
-      <div className={`
-        w-64 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-border/50 bg-card/30 backdrop-blur-sm z-50
-        ${isMobileMenuOpen ? 'fixed left-0' : 'hidden lg:block'}
-      `}>
-        <div className="p-6 sticky top-0">
-          <div className="flex items-center gap-2 mb-6">
-            <FileText className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Contents</h2>
-            {/* Mobile Close Button */}
-            <button
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="lg:hidden ml-auto p-1 rounded-md hover:bg-accent/50 transition-colors"
-              aria-label="Close contents"
+    <nav aria-label="Contents" className="lg:sticky lg:top-[100px] lg:self-start">
+      <p className="hidden text-sm font-semibold lg:block">Contents</p>
+      <ol className="-mx-5 flex gap-1 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8 lg:mx-0 lg:mt-3 lg:flex-col lg:gap-0 lg:overflow-visible lg:px-0 lg:pb-0">
+        {sections.map((item) => (
+          <li key={item.id} className="shrink-0">
+            <a
+              href={`#${item.id}`}
+              className={cn(
+                "flex items-baseline gap-3 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm transition-colors lg:rounded-none lg:border-0 lg:border-l-2 lg:px-0 lg:pl-4 lg:py-1.5",
+                current === item.id
+                  ? "border-ink text-ink lg:border-ink"
+                  : "border-line-strong text-ink-2 hover:text-ink lg:border-line",
+              )}
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <nav className="space-y-2">
-            {sections.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-muted/50 transition-colors group"
-              >
-                <div className="w-6 h-6 shrink-0 bg-primary/10 group-hover:bg-primary/20 rounded-full flex items-center justify-center text-xs font-medium text-primary">
-                  {item.number}
-                </div>
-                <span className="text-foreground/80 group-hover:text-foreground">
-                  {item.title}
-                </span>
-              </a>
-            ))}
-          </nav>
-        </div>
-      </div>
-    </>
+              <span className="hidden text-[12px] tabular-nums text-ink-3 lg:inline">{item.number}</span>
+              {item.title}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }

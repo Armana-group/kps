@@ -1,7 +1,10 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { useParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { VoteButton } from "@/components/vote-button";
+import { Button } from "@/components/ui/button";
+import { formatDate, formatKoin } from "@/lib/format";
 import { getFundContract, ProjectStatus, Project, ProcessedVote, Vote } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
@@ -19,7 +22,6 @@ interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'start_date
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { address } = useKondorWalletContext();
   const [project, setProject] = useState<ProcessedProject | null>(null);
   const [votes, setVotes] = useState<ProcessedVote[]>([]);
@@ -103,38 +105,27 @@ export default function ProjectDetailPage() {
     });
   }, [address, projectId, fetchVote, project?.id]); // Use project.id to avoid infinite loop
 
-  const getStatusColor = (status: ProjectStatus) => {
+  const statusText = (status: ProjectStatus) => {
     switch (status) {
-      case ProjectStatus.Active:
-        return "bg-green-500";
-      case ProjectStatus.Upcoming:
-        return "bg-blue-500";
-      case ProjectStatus.Past:
-        return "bg-gray-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusText = (status: ProjectStatus) => {
-    switch (status) {
-      case ProjectStatus.Active:
-        return "Active";
-      case ProjectStatus.Upcoming:
-        return "Upcoming";
-      case ProjectStatus.Past:
-        return "Past";
-      default:
-        return "Unknown";
+      case ProjectStatus.Active: return "Active";
+      case ProjectStatus.Upcoming: return "Starting soon";
+      case ProjectStatus.Past: return "Ended";
+      default: return "Unknown";
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading project...</p>
+      <div className="wrap pt-10">
+        <div className="animate-pulse">
+          <div className="h-4 w-24 rounded bg-panel-strong" />
+          <div className="mt-12 h-10 w-2/3 rounded bg-panel-strong" />
+          <div className="mt-6 h-4 w-1/2 rounded bg-panel" />
+          <div className="mt-10 space-y-3">
+            <div className="h-4 w-full rounded bg-panel" />
+            <div className="h-4 w-11/12 rounded bg-panel" />
+            <div className="h-4 w-3/4 rounded bg-panel" />
+          </div>
         </div>
       </div>
     );
@@ -142,193 +133,149 @@ export default function ProjectDetailPage() {
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold mb-2">Project Not Found</h1>
-          <p className="text-muted-foreground mb-6">{error || "The project you're looking for doesn't exist."}</p>
-          <Link href="/" className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Home
-          </Link>
-        </div>
+      <div className="wrap flex min-h-[60vh] flex-col items-center justify-center text-center">
+        <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Project not found</h1>
+        <p className="mt-2 max-w-[40ch] text-ink-2">{error || "There is no project with this id."}</p>
+        <Button variant="outline" className="mt-7" asChild>
+          <Link href="/"><ArrowLeft />All projects</Link>
+        </Button>
       </div>
     );
   }
 
   const proposalNotice = getProposalNotice(project.id);
+  const now = new Date();
+  const totalVotes = parseFloat(project.total_votes);
+  const activeVote = project.vote && project.vote.weight > 0 && project.vote.expiration >= now ? project.vote : undefined;
+  const expiredVote = project.vote && project.vote.weight > 0 && project.vote.expiration < now ? project.vote : undefined;
+
+  // Votes grouped by the month they expire in, oldest first; empty months are skipped
+  const expiryBuckets = project.votes
+    .map((raw, index) => ({ months: index + 1, amount: parseInt(raw) / 20e8 }))
+    .filter(bucket => bucket.amount > 0);
+  const maxBucket = Math.max(0, ...expiryBuckets.map(b => b.amount));
+  const paymentCount = Math.max(0, countMonthEnds(project.start_date, project.end_date));
+  const paragraphs = project.description.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Back Button */}
-      <div className="max-w-4xl mx-auto px-6 pt-8">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back
-        </button>
-      </div>
+    <div className="wrap">
+      <Link href="/" className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink">
+        <ArrowLeft className="size-3.5" strokeWidth={2} />
+        All projects
+      </Link>
 
-      {/* Project Header */}
-      <section className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
+      <div className="grid items-start gap-12 pt-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
+        <div>
           {proposalNotice && <ProposalNotice notice={proposalNotice.notice} />}
 
-          {/* Title and Status */}
-          <div className="mb-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <h1 className="text-3xl md:text-4xl font-bold font-display">{project.title}</h1>
-              <div className="flex items-center gap-2 text-sm bg-muted px-3 py-1.5 rounded-full whitespace-nowrap">
-                <div className={`w-2 h-2 ${getStatusColor(project.status)} rounded-full`}></div>
-                {getStatusText(project.status)}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-sm font-mono">Project ID:</span>
-              <span className="font-mono text-sm bg-muted px-2 py-1 rounded">#{project.id}</span>
-            </div>
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-ink-2">
+            <i className="size-2 rounded-full bg-accent" aria-hidden="true" />
+            {statusText(project.status)}
+          </span>
+          <h1 className="mt-3.5 max-w-[20ch] text-[32px] font-bold leading-[1.06] tracking-[-0.03em] text-balance lg:text-[44px]">
+            {project.title}
+          </h1>
+          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-ink-2">
+            <span>Project <b className="font-medium tabular-nums text-ink">#{project.id}</b></span>
+            <span>Asks <b className="font-medium tabular-nums text-ink">{formatKoin(project.monthly_payment)} KOIN</b> a month</span>
+            <span>{formatDate(project.start_date)} to {formatDate(project.end_date)}</span>
           </div>
 
-          {/* Description */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-3">Description</h2>
-            <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{project.description}</p>
+          <div className="mt-10 max-w-[62ch] space-y-4 text-[17px] leading-[1.6]">
+            {paragraphs.map((text, i) => <p key={i} className="whitespace-pre-wrap break-words">{linkify(text)}</p>)}
           </div>
 
-          {/* Project Details Grid */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Financial Details */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold mb-3">Financial Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                  <span className="text-muted-foreground">Monthly Payment</span>
-                  <span className="font-mono font-semibold">{project.monthly_payment} KOIN</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                  <span className="text-muted-foreground">Total Votes</span>
-                  <span className="font-mono font-semibold">{project.total_votes} KOIN</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold mb-3">Timeline</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                  <span className="text-muted-foreground">Start Date</span>
-                  <span className="font-medium">{project.start_date.toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                  <span className="text-muted-foreground">End Date</span>
-                  <span className="font-medium">{project.end_date.toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Addresses */}
-          <div className="space-y-4 mb-8">
-            <h3 className="text-lg font-semibold">Addresses</h3>
-            <div className="space-y-3">
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <div className="text-muted-foreground text-sm mb-1">Creator</div>
-                <div className="font-mono text-sm break-all">{project.creator}</div>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <div className="text-muted-foreground text-sm mb-1">Beneficiary</div>
-                <div className="font-mono text-sm break-all">{project.beneficiary}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Vote Distribution */}
-          {project.votes.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-3">Vote Distribution by Expiration</h3>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="text-sm text-muted-foreground mb-4">
-                  Votes grouped by expiration timeline (up to 6 months)
-                </div>
-                <div className="space-y-2">
-                  {project.votes.map((vote, index) => {
-                    const voteAmount = (parseInt(vote) / 20e8).toFixed(2);
-                    const monthsUntilExpiration = index + 1;
-                    const hasVotes = parseInt(vote) > 0;
-                    
-                    if (!hasVotes) return null;
-                    
-                    return (
-                      <div key={index} className="flex items-center justify-between bg-card border border-border px-4 py-3 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 bg-primary/10 text-primary rounded-full text-sm font-semibold">
-                            {monthsUntilExpiration}
-                          </div>
-                          <div>
-                            <div className="font-medium">
-                              {monthsUntilExpiration} month{monthsUntilExpiration !== 1 ? 's' : ''}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Expires in {monthsUntilExpiration} month{monthsUntilExpiration !== 1 ? 's' : ''}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono font-semibold">{voteAmount} KOIN</div>
-                          <div className="text-xs text-muted-foreground">
-                            {((parseFloat(voteAmount) / parseFloat(project.total_votes)) * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* User's Vote Status */}
-          {project.vote && (
-            <div className="mb-8 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <div className="font-semibold mb-1">You have voted on this project</div>
-                  <div className="text-sm text-muted-foreground">
-                    Weight: {project.vote.weight * 5}% • Expires: {project.vote.expiration.toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Vote Button */}
-          <div className="pt-6 border-t border-border">
-            <VoteButton
-              projectId={project.id}
-              projectTitle={project.title}
-              vote={project.vote}
-              votes={votes}
-              titles={{ [project.id]: project.title }}
-              onVoteSuccess={fetchProject}
-            />
-          </div>
+          <dl className="mt-12 border-t border-line text-[15px]">
+            <Fact label="Monthly ask"><span className="tabular-nums">{formatKoin(project.monthly_payment)} KOIN</span></Fact>
+            <Fact label="Runs">{formatDate(project.start_date)} to {formatDate(project.end_date)}{paymentCount > 0 && <> · {paymentCount} payment{paymentCount === 1 ? '' : 's'}</>}</Fact>
+            <Fact label="Beneficiary"><a className="mono break-all hover:underline" href={`https://koinscan.com/address/${project.beneficiary}`} target="_blank" rel="noreferrer">{project.beneficiary}</a></Fact>
+            <Fact label="Created by"><a className="mono break-all hover:underline" href={`https://koinscan.com/address/${project.creator}`} target="_blank" rel="noreferrer">{project.creator}</a></Fact>
+          </dl>
         </div>
-      </section>
+
+        <aside className="lg:sticky lg:top-[100px]">
+          <div className="rounded-[22px] bg-panel p-6 lg:rounded-[28px] lg:p-7">
+            <h2 className="text-[16px] font-semibold tracking-[-0.01em]">Votes</h2>
+            <div className="mt-5 text-[36px] font-semibold leading-none tracking-[-0.03em] tabular-nums">
+              {formatKoin(totalVotes)}<small className="ml-1.5 text-[16px] font-medium tracking-normal text-ink-2">KOIN</small>
+            </div>
+            <p className="mt-2 text-sm text-ink-2">
+              {totalVotes === 0
+                ? 'No votes yet. The first vote puts this project on the payout list.'
+                : expiryBuckets.length === 1
+                  ? `All of it expires in ${expiryBuckets[0].months} month${expiryBuckets[0].months === 1 ? '' : 's'}.`
+                  : 'Votes expire in the months below unless renewed.'}
+            </p>
+
+            {expiryBuckets.length > 0 && (
+              <div className="mt-6 grid gap-2.5" aria-label="Votes by expiry">
+                {expiryBuckets.map(bucket => (
+                  <div key={bucket.months} className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm">
+                    <span className="text-ink-2">Expires in {bucket.months} month{bucket.months === 1 ? '' : 's'}</span>
+                    <b className="font-semibold tabular-nums">{formatKoin(bucket.amount)}</b>
+                    <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-panel-strong" aria-hidden="true">
+                      <div className="h-full rounded-full bg-ink" style={{ width: `${maxBucket > 0 ? (bucket.amount / maxBucket) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeVote && (
+              <div className="mt-6 rounded-2xl bg-accent-soft px-4 py-3.5 text-sm leading-snug">
+                You gave this project <b className="font-semibold">{activeVote.weight * 5}%</b> of your vote. It expires {formatDate(activeVote.expiration)}.
+              </div>
+            )}
+            {expiredVote && (
+              <div className="mt-6 rounded-2xl bg-panel-strong px-4 py-3.5 text-sm leading-snug text-ink-2">
+                Your {expiredVote.weight * 5}% vote expired {formatDate(expiredVote.expiration)} and no longer counts. Vote again to renew it.
+              </div>
+            )}
+
+            <div className="mt-5">
+              <VoteButton
+                variant="panel"
+                projectId={project.id}
+                projectTitle={project.title}
+                vote={project.vote}
+                votes={votes}
+                titles={{ [project.id]: project.title }}
+                onVoteSuccess={fetchProject}
+              />
+            </div>
+            <p className="mt-3.5 text-center text-[13px] text-ink-2">Voting signs one transaction in Kondor. Nothing is spent.</p>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
 
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid border-b border-line py-4 sm:grid-cols-[200px_1fr] sm:gap-4">
+      <dt className="text-ink-2">{label}</dt>
+      <dd className="mt-0.5 min-w-0 font-medium sm:mt-0">{children}</dd>
+    </div>
+  );
+}
+
+/** Month-end payouts between two dates, inclusive of an end that lands on a month end. */
+function countMonthEnds(start: Date, end: Date): number {
+  let count = 0;
+  const cursor = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
+  while (cursor <= end) {
+    count++;
+    cursor.setMonth(cursor.getMonth() + 2, 0);
+  }
+  return count;
+}
+
+/** Turns bare http(s) URLs in proposal text into links. */
+function linkify(text: string): ReactNode[] {
+  return text.split(/(https?:\/\/[^\s)]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part)
+      ? <a key={i} href={part} target="_blank" rel="noreferrer" className="underline underline-offset-[3px] decoration-1 break-all">{part.replace(/^https?:\/\//, '')}</a>
+      : part
+  );
+}

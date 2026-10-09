@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Loader2, Trash2, Vote } from 'lucide-react';
+import { ChevronDown, Loader2, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,8 @@ import {
 import { ProcessedVote } from '@/lib/utils';
 import { getVoteBudget, isVoteActive } from '@/lib/vote-budget';
 import { useSubmitVote } from '@/hooks/useSubmitVote';
+import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 interface YourVotesProps {
   votes: ProcessedVote[];
@@ -18,7 +20,7 @@ interface YourVotesProps {
   onChange: () => void;
 }
 
-// A small button that opens every vote the connected wallet holds, including
+// A header control that opens every vote the connected wallet holds, including
 // ones on projects that aren't listed on the page, so the 100% limit is never a surprise.
 export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
   const submitVote = useSubmitVote();
@@ -40,53 +42,61 @@ export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-1.5 h-8 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors">
-          <Vote className="w-3.5 h-3.5 text-primary" />
-          Your votes · {remainingPercent}% left
-          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        <button
+          type="button"
+          className="inline-flex h-10 items-center gap-2.5 rounded-full border border-line-strong pl-4 pr-3.5 text-sm font-medium text-ink transition-colors hover:border-ink"
+        >
+          <span className="hidden sm:inline">Your votes</span>
+          <span aria-hidden="true" className="h-1 w-11 overflow-hidden rounded-full bg-panel-strong">
+            <span className="block h-full bg-accent" style={{ width: `${Math.min(usedPercent, 100)}%` }} />
+          </span>
+          <span className="tabular-nums">{usedPercent}% used</span>
+          <ChevronDown className="size-3 text-ink-2" strokeWidth={2} />
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 p-3">
-        <div className="flex items-baseline justify-between mb-2">
-          <p className="text-sm font-semibold">Your votes</p>
-          <p className="text-xs text-muted-foreground">{usedPercent}% used · {remainingPercent}% left</p>
+      <DropdownMenuContent align="end" sideOffset={10} className="w-[340px] rounded-[20px] border-line p-5 shadow-[0_24px_48px_-24px_rgba(0,0,0,.25)]">
+        <div className="flex items-baseline justify-between">
+          <p className="text-[16px] font-semibold tracking-[-0.01em]">Your votes</p>
+          <p className="text-[13px] tabular-nums text-ink-2">{usedPercent}% used · {remainingPercent}% left</p>
         </div>
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-3">
-          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(usedPercent, 100)}%` }} />
+        <div className="mb-1.5 mt-2.5 h-1.5 overflow-hidden rounded-full bg-panel-strong" aria-hidden="true">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(usedPercent, 100)}%` }} />
         </div>
 
         {listed.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-2">You haven&apos;t voted on any project yet.</p>
+          <p className="py-3 text-sm text-ink-2">You haven&apos;t voted on any project yet.</p>
         ) : (
-          <ul className="divide-y divide-border/60 max-h-72 overflow-y-auto">
+          <ul className="max-h-72 overflow-y-auto">
             {listed.map(vote => {
               const active = isVoteActive(vote, now);
+              const title = titles[vote.project_id] ?? `Project #${vote.project_id}`;
               return (
-                <li key={vote.project_id} className="flex items-center gap-2 py-2">
+                <li key={vote.project_id} className="flex items-center gap-3 border-t border-line py-3 first:border-t-0">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/projects/${vote.project_id}`} className="text-sm hover:text-primary truncate block">
-                      {titles[vote.project_id] ?? `Project #${vote.project_id}`}
+                    <Link href={`/projects/${vote.project_id}`} className="block truncate text-[15px] font-medium hover:underline hover:underline-offset-[3px]">
+                      {title}
                     </Link>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[13px] text-ink-2">
                       {active
-                        ? `Expires ${vote.expiration.toLocaleDateString()}`
-                        : `Expired ${vote.expiration.toLocaleDateString()}, no longer counts`}
+                        ? `Expires ${formatDate(vote.expiration)}`
+                        : `Expired ${formatDate(vote.expiration)}, no longer counts`}
                     </p>
                   </div>
-                  <span className={`font-mono text-xs ${active ? 'font-semibold' : 'text-muted-foreground line-through'}`}>
+                  <span className={cn('text-[15px] tabular-nums', active ? 'font-semibold' : 'text-ink-3 line-through')}>
                     {vote.weight * 5}%
                   </span>
                   <button
+                    type="button"
                     onClick={() => handleRemove(vote.project_id)}
                     disabled={removingId !== null}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-accent/50 disabled:opacity-50 transition-colors"
-                    aria-label={`Remove vote on ${titles[vote.project_id] ?? `project #${vote.project_id}`}`}
+                    className="grid size-7 place-items-center rounded-full text-ink-3 transition-colors hover:bg-panel hover:text-ink disabled:opacity-50"
+                    aria-label={`Remove vote on ${title}`}
                     title="Remove vote"
                   >
                     {removingId === vote.project_id
-                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      : <Trash2 className="w-3.5 h-3.5" />}
+                      ? <Loader2 className="size-3.5 animate-spin" />
+                      : <X className="size-3.5" strokeWidth={1.8} />}
                   </button>
                 </li>
               );
@@ -94,9 +104,9 @@ export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
           </ul>
         )}
 
-        <p className="text-[11px] text-muted-foreground mt-2 pt-2 border-t border-border/60">
-          Split up to 100% of your KOIN and VHP across projects. Votes last about 6 months.{' '}
-          <Link href="/docs#voting-system" className="underline hover:text-foreground">How voting works</Link>
+        <p className="mt-2 border-t border-line pt-3 text-[13px] leading-snug text-ink-2">
+          Split up to 100% of your KOIN and VHP across projects. Votes last about six months.{' '}
+          <Link href="/docs#voting-system" className="underline underline-offset-[3px] hover:text-ink">How voting works</Link>
         </p>
       </DropdownMenuContent>
     </DropdownMenu>

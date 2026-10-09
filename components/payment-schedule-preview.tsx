@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from 'react';
-import { CalendarClock, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getFundContract } from '@/lib/utils';
 import { buildPaymentSchedule, endDateAfterPayment, formatKoinUnits, getProjectDateTimestamps, requestedPaymentUnits } from '@/lib/payment-schedule';
@@ -59,14 +59,12 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
   const visibleSlots = compact ? [...slots.slice(0, 2), ...slots.slice(-2)] : slots;
 
   return (
-    <section aria-label="Payment schedule preview" className="bg-muted/30 rounded-2xl p-6 border border-border/50 space-y-4">
-      <h3 className="text-lg font-medium flex items-center gap-2">
-        <CalendarClock className="w-5 h-5 text-primary" /> Payment Preview
-      </h3>
+    <section aria-label="Payment schedule preview" className="rounded-2xl border border-line-strong p-5 space-y-4">
+      <h3 className="text-[16px] font-semibold tracking-[-0.01em]">Payment preview</h3>
       {!validDates ? (
-        <p className="text-sm text-muted-foreground">Choose valid start and end dates to see which payments are included.</p>
+        <p className="text-sm text-ink-2">Choose valid start and end dates to see which payments are included.</p>
       ) : loading ? (
-        <p role="status" className="text-sm text-muted-foreground flex items-center gap-2">
+        <p role="status" className="text-sm text-ink-2 flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading payment dates from the fund...
         </p>
       ) : error ? (
@@ -76,7 +74,7 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
         </div>
       ) : paymentTimes ? (
         <>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-ink-2">
             Start: {paymentDateFormat.format(timestamps!.start)} UTC.
             {' '}End: {paymentDateFormat.format(timestamps!.end)} UTC.
             {' '}Monthly payments are normally scheduled for the last day of the month at 12:00 UTC.
@@ -84,7 +82,7 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
             {' '}The proposal must still be active when payment is processed.
           </p>
           {excludedEndPayment && (
-            <div role="alert" className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 space-y-3">
+            <div role="alert" className="rounded-xl bg-panel-strong p-4 space-y-3">
               <p className="text-sm">
                 Your end date excludes the payment on {paymentDateFormat.format(excludedEndPayment.timestamp)} UTC.
                 {' '}The proposal ends at 13:00 UTC, at or before this payment.
@@ -98,11 +96,11 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
             {eligible.length} eligible payment{eligible.length === 1 ? '' : 's'}
             {units !== null && <> · Up to {formatKoinUnits(units * BigInt(eligible.length))} KOIN in total</>}
           </p>
-          {eligible.length === 0 && <p className="text-sm text-amber-600 dark:text-amber-400">No scheduled payment falls within these dates.</p>}
+          {eligible.length === 0 && <p className="text-sm text-danger">No scheduled payment falls within these dates.</p>}
           {slots.length > 0 && (
             <div className="overflow-auto max-h-80">
               <table id={tableId} className="w-full text-sm text-left">
-                <thead><tr className="border-b border-border">
+                <thead><tr className="border-b border-line">
                   <th scope="col" className="py-2 pr-3 font-medium">Scheduled (UTC)</th>
                   <th scope="col" className="py-2 pr-3 font-medium">Up to (KOIN)</th>
                   <th scope="col" className="py-2 font-medium">Included?</th>
@@ -119,10 +117,10 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
             </Button>
           )}
           {!projected && end !== null && end > Number(paymentTimes[paymentTimes.length - 1]) && (
-            <p className="text-xs text-muted-foreground">Only registered payment dates are shown. The fund has not registered later dates, and its current schedule could not be projected.</p>
+            <p className="text-xs text-ink-2">Only registered payment dates are shown. The fund has not registered later dates, and its current schedule could not be projected.</p>
           )}
-          {projected && <p className="text-xs text-muted-foreground">Dates beyond the fund&apos;s registered schedule are projected using the current month-end rule and may change.</p>}
-          <p className="text-sm text-muted-foreground">
+          {projected && <p className="text-xs text-ink-2">Dates beyond the fund&apos;s registered schedule are projected using the current month-end rule and may change.</p>}
+          <p className="text-sm text-ink-2">
             Included payments are eligible, not guaranteed. The fund pays projects by vote ranking and available budget; each payment can be full, partial, or zero.
             {' '}Payments are processed in the first block that triggers the scheduled payout, so receipt may be later than the time shown. There is no daily proration.
           </p>
@@ -135,11 +133,11 @@ export function PaymentSchedulePreview({ startDate, endDate, monthlyPayment, onE
 function PaymentRows({ slot, units, hiddenCount }: { slot: ReturnType<typeof buildPaymentSchedule>[number]; units: bigint | null; hiddenCount: number }) {
   return (
     <>
-      {hiddenCount > 0 && <tr><td colSpan={3} className="py-3 text-center text-muted-foreground">{hiddenCount} more payment dates between these months</td></tr>}
-      <tr className="border-b border-border/50">
+      {hiddenCount > 0 && <tr><td colSpan={3} className="py-3 text-center text-ink-2">{hiddenCount} more payment dates between these months</td></tr>}
+      <tr className="border-b border-line">
         <td className="py-3 pr-3">
           <time dateTime={new Date(slot.timestamp).toISOString()}>{paymentDateFormat.format(slot.timestamp)}</time>
-          {slot.source === 'projected' && <span className="block text-xs text-muted-foreground">Projected date</span>}
+          {slot.source === 'projected' && <span className="block text-xs text-ink-2">Projected date</span>}
         </td>
         <td className="py-3 pr-3">{slot.eligible ? units !== null ? formatKoinUnits(units) : 'Enter amount' : '0'}</td>
         <td className="py-3">{slot.eligible ? 'Yes' : slot.reason === 'ended' ? 'No — proposal ended' : 'No — not started'}</td>

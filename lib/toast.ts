@@ -196,9 +196,9 @@ export const blockchainToast = {
       icon: '⚠️',
       duration: 4000,
       style: {
-        background: 'hsl(var(--card))',
-        color: 'hsl(var(--card-foreground))',
-        border: '1px solid hsl(var(--warning))',
+        background: 'var(--paper)',
+        color: 'var(--ink)',
+        border: '1px solid var(--line-strong)',
       },
       ...options,
     });
