@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useKondorWalletContext } from '@/contexts/KondorWalletContext';
-import { getFundContract, ProcessedVote } from '@/lib/utils';
+import { ProcessedVote } from '@/lib/utils';
+import { getVoteBudget } from '@/lib/vote-budget';
+import { useSubmitVote } from '@/hooks/useSubmitVote';
 import { ThumbsUp, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { ProviderInterface, SignerInterface } from 'koilib';
 import toast from 'react-hot-toast';
 import { VoteConfirmationModal } from '@/components/vote-confirmation-modal';
 
@@ -13,16 +14,22 @@ interface VoteButtonProps {
   projectId: number;
   projectTitle?: string;
   vote?: ProcessedVote;
+  /** All of the wallet's votes, so the modal can show how much is left to give. */
+  votes?: ProcessedVote[];
+  /** Project titles by id, used to name the other votes in error messages. */
+  titles?: Record<number, string>;
   onVoteSuccess?: () => void;
 }
 
-export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: VoteButtonProps) {
-  const { isConnected, address, getKondorProvider, getKondorSigner } = useKondorWalletContext();
+export function VoteButton({ projectId, projectTitle, vote, votes = [], titles = {}, onVoteSuccess }: VoteButtonProps) {
+  const { isConnected, address } = useKondorWalletContext();
+  const submitVote = useSubmitVote();
   const [isVoting, setIsVoting] = useState(false);
   const [justVoted, setJustVoted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const now = new Date();
+  const { usedPercent: otherVotesPercent, remainingPercent } = getVoteBudget(votes, now, projectId);
 
   const handleVoteClick = () => {
     if (!isConnected || !address) {
@@ -33,83 +40,26 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
   };
 
   const handleVote = async (votePercentage: number) => {
-    if (!isConnected || !address) {
-      toast.error('Please connect your wallet first');
-      return;
-    }
-
     setIsVoting(true);
+    const succeeded = await submitVote(projectId, votePercentage, votes, titles);
+    setIsVoting(false);
+    if (!succeeded) return;
 
-    const submitVote = async () => {
-      // Get both provider and signer from Kondor
-      const provider = getKondorProvider() as ProviderInterface;
-      const signer = await getKondorSigner() as SignerInterface;
+    // Show success state
+    setJustVoted(true);
 
-      // Get the fund contract with both provider and signer
-      const fund = getFundContract(provider, signer);
+    // Close the modal
+    setIsModalOpen(false);
 
-      // Create and send the vote transaction
-      const { transaction, receipt } = await fund.functions.update_vote({
-        voter: address,
-        project_id: projectId,
-        weight: votePercentage / 5, // Use the selected vote percentage
-      });
-
-      console.log('Vote transaction result:', { transaction, receipt });
-
-      // Wait for the transaction to be mined (if transaction exists)
-      if (transaction?.id) {
-        const { blockNumber } = await provider.wait(transaction.id);
-        console.log(`Vote transaction mined in block ${blockNumber}`);
-      }
-
-      return { transaction, votePercentage };
-    };
-
-    try {
-      await toast.promise(
-        submitVote(),
-        {
-          loading: 'Submitting your vote...',
-          success: (data) => `Vote of ${data.votePercentage}% submitted successfully!`,
-          error: 'Failed to submit vote. Please try again.',
-        },
-        {
-          style: {
-            minWidth: '250px',
-          },
-          success: {
-            duration: 4000,
-            icon: '🗳️',
-          },
-          error: {
-            duration: 6000,
-          },
-        }
-      );
-
-            // Show success state
-      setJustVoted(true);
-
-      // Close the modal
-      setIsModalOpen(false);
-
-      // Call the success callback to refresh data
-      if (onVoteSuccess) {
-        onVoteSuccess();
-      }
-
-      // Reset the success state after 3 seconds
-      setTimeout(() => {
-        setJustVoted(false);
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error voting:', error);
-      // Error is already handled by toast.promise
-    } finally {
-      setIsVoting(false);
+    // Call the success callback to refresh data
+    if (onVoteSuccess) {
+      onVoteSuccess();
     }
+
+    // Reset the success state after 3 seconds
+    setTimeout(() => {
+      setJustVoted(false);
+    }, 3000);
   };
 
   // Helper function to format expiration date
@@ -212,6 +162,9 @@ export function VoteButton({ projectId, projectTitle, vote, onVoteSuccess }: Vot
         onConfirm={handleVote}
         projectId={projectId}
         projectTitle={projectTitle}
+        currentPercentage={vote && vote.expiration >= now ? vote.weight * 5 : 0}
+        otherVotesPercent={otherVotesPercent}
+        remainingPercent={remainingPercent}
         isLoading={isVoting}
       />
     </>

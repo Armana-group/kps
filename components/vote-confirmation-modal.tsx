@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -19,6 +19,12 @@ interface VoteConfirmationModalProps {
   onConfirm: (votePercentage: number) => Promise<void>;
   projectId: number;
   projectTitle?: string;
+  /** The wallet's current active vote on this project, in percent. */
+  currentPercentage?: number;
+  /** Percent already given to other projects. */
+  otherVotesPercent?: number;
+  /** The most this project can receive without going over 100%. */
+  remainingPercent?: number;
   isLoading?: boolean;
 }
 
@@ -28,9 +34,20 @@ export function VoteConfirmationModal({
   onConfirm,
   projectId,
   projectTitle,
+  currentPercentage = 0,
+  otherVotesPercent = 0,
+  remainingPercent = 100,
   isLoading = false,
 }: VoteConfirmationModalProps) {
-  const [votePercentage, setVotePercentage] = useState<number[]>([50]); // Default to 50%
+  // Start from the existing vote, otherwise 50% or whatever is left if less
+  const defaultPercentage = currentPercentage > 0 ? currentPercentage : Math.min(50, remainingPercent);
+  const [votePercentage, setVotePercentage] = useState<number[]>([defaultPercentage]);
+
+  useEffect(() => {
+    if (isOpen) setVotePercentage([defaultPercentage]);
+  }, [isOpen, defaultPercentage]);
+
+  const nothingLeftToGive = remainingPercent === 0 && currentPercentage === 0;
 
   // Calculate expiration date (6 months from now, last day of the month)
   const calculateExpirationDate = () => {
@@ -46,9 +63,9 @@ export function VoteConfirmationModal({
   };
 
   const handleSliderChange = (value: number[]) => {
-    // Ensure the value is in multiples of 5
+    // Ensure the value is in multiples of 5 and stays within what's left to give
     const roundedValue = Math.round(value[0] / 5) * 5;
-    setVotePercentage([roundedValue]);
+    setVotePercentage([Math.min(roundedValue, remainingPercent)]);
   };
 
   const percentageOptions = [0, 25, 50, 75, 100];
@@ -77,6 +94,19 @@ export function VoteConfirmationModal({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
+          {/* How much of the wallet's vote is already used elsewhere */}
+          <div className={`rounded-lg p-3 text-sm ${nothingLeftToGive
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200'
+            : 'bg-muted/50 text-muted-foreground'}`}>
+            {nothingLeftToGive ? (
+              <>You&apos;ve already given 100% of your vote to other projects. Lower or remove one of them under &quot;Your votes&quot; first.</>
+            ) : otherVotesPercent > 0 ? (
+              <>You&apos;ve given {otherVotesPercent}% of your vote to other projects, so you can give this one up to <strong>{remainingPercent}%</strong>.</>
+            ) : (
+              <>You can split 100% of your vote across projects. This vote can be up to <strong>{remainingPercent}%</strong>.</>
+            )}
+          </div>
+
           {/* Vote Percentage Display */}
           <div className="text-center">
             <div className="text-3xl font-bold text-primary mb-2">
@@ -106,6 +136,7 @@ export function VoteConfirmationModal({
                   variant={votePercentage[0] === option ? "default" : "outline"}
                   size="sm"
                   onClick={() => setVotePercentage([option])}
+                  disabled={option > remainingPercent}
                   className="flex-1 text-xs"
                 >
                   {option}%
@@ -150,7 +181,7 @@ export function VoteConfirmationModal({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || nothingLeftToGive}
             className="flex-1"
           >
             {isLoading ? (

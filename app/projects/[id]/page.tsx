@@ -22,6 +22,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const { address } = useKondorWalletContext();
   const [project, setProject] = useState<ProcessedProject | null>(null);
+  const [votes, setVotes] = useState<ProcessedVote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function ProjectDetailPage() {
       expiration: new Date(parseInt(vote.expiration) + 24 * 3600 * 1000), // add 24 hours to the expiration
     }));
 
+    setVotes(processedVotes);
     return processedVotes.find(v => v.project_id === projectId);
   }, [address, projectId]);
 
@@ -319,6 +321,8 @@ export default function ProjectDetailPage() {
               projectId={project.id}
               projectTitle={project.title}
               vote={project.vote}
+              votes={votes}
+              titles={{ [project.id]: project.title }}
               onVoteSuccess={fetchProject}
             />
           </div>

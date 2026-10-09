@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getProposalNotice, isProposalHidden } from "@/lib/proposal-visibility";
 import { ProposalNotice } from "@/components/proposal-notice";
 import { VoteButton } from "@/components/vote-button";
+import { YourVotes } from "@/components/your-votes";
 import { getFundContract, ProjectStatus, OrderBy, Project, Vote, ProcessedVote, FUND_ADDRESS, getKoinContract } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
@@ -26,7 +27,8 @@ export default function Home() {
   const { address } = useKondorWalletContext();
   const [activeProjects, setActiveProjects] = useState<ProcessedProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
-  const [, setVotes] = useState<ProcessedVote[]>([]);
+  const [votes, setVotes] = useState<ProcessedVote[]>([]);
+  const [voteTitles, setVoteTitles] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [fundBalance, setFundBalance] = useState<number | null>(null);
   const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
@@ -245,6 +247,19 @@ export default function Home() {
     fetchData();
   }, [fetchData]);
 
+  // Titles for every project the wallet voted on, including past and hidden ones
+  useEffect(() => {
+    const missingIds = votes.map(vote => vote.project_id).filter(id => !(id in voteTitles));
+    if (missingIds.length === 0) return;
+    const fund = getFundContract();
+    Promise.all(missingIds.map(async id => {
+      const { result } = await fund.functions.get_project<Project>({ project_id: id });
+      return [id, result?.title ?? `Project #${id}`] as const;
+    }))
+      .then(entries => setVoteTitles(prev => ({ ...prev, ...Object.fromEntries(entries) })))
+      .catch(error => console.error("Error fetching voted project titles:", error));
+  }, [votes, voteTitles]);
+
   useEffect(() => {
     console.log("fetching votes, address:", address);
     fetchVotes().then((processedVotes) => {
@@ -267,6 +282,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Sits under the wallet and theme buttons, lined up with the header's right edge */}
+      {address && (
+        <div className="container mx-auto px-4 md:px-6 relative z-40">
+          <div className="absolute right-4 md:right-6 top-2">
+            <YourVotes votes={votes} titles={voteTitles} onChange={fetchData} />
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative py-20 lg:py-32">
@@ -414,6 +437,8 @@ export default function Home() {
                       projectId={project.id}
                       projectTitle={project.title}
                       vote={project.vote}
+                      votes={votes}
+                      titles={voteTitles}
                       onVoteSuccess={fetchData}
                     />
                   </div>
