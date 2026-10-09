@@ -126,7 +126,7 @@ Your project shows as "Upcoming" until its start date, then becomes "Active" and
 
 ### Where the money comes from
 
-New KOIN arrives in the fund with every block, a few thousand KOIN a day. KOIN that isn't paid out stays in the fund.
+The Koinos protocol mints new KOIN for the fund with every block, at a rate of 2% of the KOIN supply per year (a few thousand KOIN a day). KOIN that isn't paid out stays in the fund.
 
 ### How much each payout can spend
 
