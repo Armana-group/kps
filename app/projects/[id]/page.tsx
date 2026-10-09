@@ -6,6 +6,7 @@ import { getFundContract, ProjectStatus, Project, ProcessedVote, Vote } from "@/
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
+import { LinkedText } from "@/components/linked-text";
 import { ProposalNotice } from "@/components/proposal-notice";
 import { getProposalNotice } from "@/lib/proposal-visibility";
 
@@ -184,8 +185,8 @@ export default function ProjectDetailPage() {
 
           {/* Title and Status */}
           <div className="mb-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <h1 className="text-3xl md:text-4xl font-bold font-display">{project.title}</h1>
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-4">
+              <h1 className="min-w-0 break-words text-3xl md:text-4xl font-bold font-display">{project.title}</h1>
               <div className="flex items-center gap-2 text-sm bg-muted px-3 py-1.5 rounded-full whitespace-nowrap">
                 <div className={`w-2 h-2 ${getStatusColor(project.status)} rounded-full`}></div>
                 {getStatusText(project.status)}
@@ -200,7 +201,7 @@ export default function ProjectDetailPage() {
           {/* Description */}
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-3">Description</h2>
-            <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{project.description}</p>
+            <LinkedText text={project.description} />
           </div>
 
           {/* Project Details Grid */}
