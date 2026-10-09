@@ -58,8 +58,6 @@ export interface ProcessedProject extends Omit<Project, 'monthly_payment' | 'sta
 const KOIN_UNITS = 1e8;
 // Project vote totals are stored in 5% vote units of KOIN satoshis
 const VOTE_UNITS = 20 * KOIN_UNITS;
-// The site treats a vote as active for one day past its on-chain expiration
-const VOTE_GRACE_MS = 24 * 3600 * 1000;
 
 /**
  * Read-only connection to the public RPC, shared by every read. The node turns
@@ -140,7 +138,8 @@ export async function fetchUserVotes(voter: string): Promise<ProcessedVote[]> {
   const { result } = await getFundContract().functions.get_user_votes<{ votes: Vote[] }>({ voter });
   return (result?.votes || []).map(vote => ({
     ...vote,
-    expiration: new Date(parseInt(vote.expiration) + VOTE_GRACE_MS),
+    // The payout at this time is the last one the vote counts in
+    expiration: new Date(parseInt(vote.expiration)),
   }));
 }
 

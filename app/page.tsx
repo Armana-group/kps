@@ -9,21 +9,22 @@ import { ProjectRow, ProjectRowHeader, ProjectRowSkeleton } from "@/components/p
 import { HowItWorks } from "@/components/how-it-works";
 import { Button, ButtonArrow } from "@/components/ui/button";
 import { getFundContract, getKoinContract, fetchProjects, fetchUserVotes, ProjectStatus, Project, ProcessedProject, ProcessedVote, FUND_ADDRESS } from "@/lib/utils";
-import { distributePayments } from "@/lib/payouts";
+import { distributePayments, estimatePayoutBudget, isInPayout, type PayoutBudget } from "@/lib/payouts";
 import { formatShortDate } from "@/lib/format";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 
-type ActiveProject = ReturnType<typeof distributePayments<ProcessedProject>>[number];
+type PayoutProject = ReturnType<typeof distributePayments<ProcessedProject>>[number];
 
 export default function Home() {
   const { address } = useKondorWalletContext();
-  const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
+  const [activeProjects, setActiveProjects] = useState<PayoutProject[]>([]);
+  const [payouts, setPayouts] = useState<PayoutProject[]>([]);
   const [upcomingProjects, setUpcomingProjects] = useState<ProcessedProject[]>([]);
   const [votes, setVotes] = useState<ProcessedVote[]>([]);
   const [voteTitles, setVoteTitles] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
-  const [fundBalance, setFundBalance] = useState<number | null>(null);
+  const [payoutBudget, setPayoutBudget] = useState<PayoutBudget | null>(null);
   const [nextPaymentTime, setNextPaymentTime] = useState<Date | null>(null);
 
   // Each load gets an id; only the latest one may update the page, so a slow
@@ -40,28 +41,29 @@ export default function Home() {
     try {
       const [balanceResult, globalVarsResult, active, upcoming] = await Promise.all([
         getKoinContract().functions.balanceOf<{ value: string }>({ owner: FUND_ADDRESS }),
-        getFundContract().functions.get_global_vars<{ payment_times: string[] }>(),
+        getFundContract().functions.get_global_vars<{ payment_times: string[]; remaining_balance?: string }>(),
         fetchProjects(ProjectStatus.Active),
         fetchProjects(ProjectStatus.Upcoming),
       ]);
       if (loadId !== projectsLoadId.current) return;
 
       const balance = parseInt(balanceResult.result?.value || "0") / 1e8;
+      const remainingBalance = parseInt(globalVarsResult.result?.remaining_balance || "0") / 1e8;
       const nextPaymentTimestamp = globalVarsResult.result?.payment_times[0];
       const nextPayment = nextPaymentTimestamp ? new Date(parseInt(nextPaymentTimestamp)) : null;
       const now = new Date();
 
-      // Active projects that are still running at the next payout, plus upcoming
-      // ones whose start date has passed
-      const payable = [
-        ...active.filter(project => !nextPayment || project.end_date >= nextPayment),
-        ...upcoming.filter(project => project.start_date <= now),
-      ];
+      // At payout time the contract activates projects that have started and
+      // retires ones that have ended, then pays in vote order from the budget
+      const budget = nextPayment ? estimatePayoutBudget({ balance, remainingBalance, nextPayout: nextPayment, now }) : null;
+      const inPayout = [...active, ...upcoming].filter(project => isInPayout(project, nextPayment ?? now));
+      const allocated = distributePayments(inPayout, budget?.budget ?? 0, FUND_ADDRESS);
 
-      setFundBalance(balance);
+      setPayoutBudget(budget);
       setNextPaymentTime(nextPayment);
+      setPayouts(allocated);
       // Hide cards after allocation: hidden proposals still compete for funds on-chain.
-      setActiveProjects(distributePayments(payable, balance).filter(project => !isProposalHidden(project.id, project.votes)));
+      setActiveProjects(allocated.filter(project => project.start_date <= now && !isProposalHidden(project.id, project.votes)));
       setUpcomingProjects(upcoming.filter(project => project.start_date > now && !isProposalHidden(project.id, project.votes)));
     } catch (error) {
       if (loadId !== projectsLoadId.current) return;
@@ -142,7 +144,7 @@ export default function Home() {
             The Koinos community decides what gets funded.
           </h1>
           <p className="mt-6 max-w-[44ch] text-[18px] leading-normal text-ink-2">
-            Every month the fund pays the projects with the most support. Vote with the KOIN you already hold. Nothing is spent and nothing is locked.
+            Every month the fund pays the projects with the most support. Vote with the KOIN and VHP you already hold. Nothing is spent and nothing is locked.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button size="lg" asChild>
@@ -158,9 +160,10 @@ export default function Home() {
         </div>
 
         <PayoutPanel
-          fundBalance={fundBalance}
+          budget={payoutBudget}
           nextPaymentTime={nextPaymentTime}
-          activeProjects={activeProjects}
+          payouts={payouts}
+          activeCount={activeProjects.length}
           upcomingCount={upcomingProjects.length}
           loading={loading}
         />
@@ -171,7 +174,7 @@ export default function Home() {
         <div className="mb-5 flex items-end justify-between gap-6">
           <div>
             <h2 id="active-heading" className="text-[24px] font-semibold leading-tight tracking-[-0.025em] lg:text-[28px]">Being paid now</h2>
-            <p className="mt-1.5 text-[15px] text-ink-2">Open for voting. Paid on {nextPayoutLabel} in this order until the fund is empty.</p>
+            <p className="mt-1.5 text-[15px] text-ink-2">Open for voting. Paid on {nextPayoutLabel} in this order until that payout&apos;s budget runs out.</p>
           </div>
           <span className="hidden whitespace-nowrap text-sm text-ink-2 sm:block">Sorted by votes</span>
         </div>

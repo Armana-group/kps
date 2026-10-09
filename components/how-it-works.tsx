@@ -15,7 +15,7 @@ const items = [
   },
   {
     title: 'Paid monthly, in vote order',
-    body: 'On the last day of the month the fund pays the highest-voted project first, then the next, until the balance runs out. Votes expire after six months.',
+    body: 'On the last day of each month the fund pays the highest-voted project first, then the next, until that payout’s budget runs out: twice the KOIN that came in since the last payout. A vote counts in the next six payouts.',
     art: (
       <svg viewBox="0 0 96 96" className="size-[92px] fill-none stroke-ink" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M20 72V40M38 72V24M56 72V48M74 72V34" />

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/format';
+import { voteExpiry } from '@/lib/payouts';
 import { cn } from '@/lib/utils';
 
 interface VoteConfirmationModalProps {
@@ -54,9 +55,9 @@ export function VoteConfirmationModal({
   const nothingLeftToGive = remainingPercent === 0 && currentPercentage === 0;
   const removing = pct === 0 && currentPercentage > 0;
 
-  // Votes expire on the last day of the 6th month from now
+  // update_vote sets the expiry to the sixth upcoming payout
   const now = new Date();
-  const expirationDate = new Date(now.getFullYear(), now.getMonth() + 6, 0);
+  const expirationDate = voteExpiry(now);
 
   const handleSliderChange = (value: number[]) => {
     const rounded = Math.round(value[0] / 5) * 5;
@@ -125,7 +126,7 @@ export function VoteConfirmationModal({
           {removing ? (
             <>This removes your vote from the project. You can vote again any time.</>
           ) : (
-            <>Counts from today until <b className="font-medium text-ink">{formatDate(expirationDate)}</b>, then expires. You can change or remove it any time.</>
+            <>Counts from today through the <b className="font-medium text-ink">{formatDate(expirationDate)}</b> payout, then expires. You can change or remove it any time.</>
           )}
         </p>
 

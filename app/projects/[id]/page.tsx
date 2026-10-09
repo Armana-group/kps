@@ -4,9 +4,10 @@ import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { VoteButton } from "@/components/vote-button";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatKoin } from "@/lib/format";
+import { formatDate, formatKoin, formatShortDate } from "@/lib/format";
 import { getFundContract, fetchUserVotes, toProcessedProject, voteUnitsToKoin, ProjectStatus, Project, ProcessedProject, ProcessedVote } from "@/lib/utils";
 import { isVoteActive } from "@/lib/vote-budget";
+import { countPayouts } from "@/lib/payouts";
 import toast from "react-hot-toast";
 import { useKondorWalletContext } from "@/contexts/KondorWalletContext";
 import Link from "next/link";
@@ -18,6 +19,7 @@ export default function ProjectDetailPage() {
   const { address } = useKondorWalletContext();
   const [project, setProject] = useState<ProcessedProject | null>(null);
   const [votes, setVotes] = useState<ProcessedVote[]>([]);
+  const [paymentTimes, setPaymentTimes] = useState<Date[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,12 @@ export default function ProjectDetailPage() {
     }
 
     try {
-      const { result } = await getFundContract().functions.get_project<Project>({ project_id: projectId });
+      const fund = getFundContract();
+      const [{ result }, { result: globalVars }] = await Promise.all([
+        fund.functions.get_project<Project>({ project_id: projectId }),
+        fund.functions.get_global_vars<{ payment_times: string[] }>(),
+      ]);
+      setPaymentTimes((globalVars?.payment_times ?? []).map(time => new Date(parseInt(time))));
       if (result) {
         setProject(toProcessedProject(result));
         setError(null);
@@ -115,12 +122,14 @@ export default function ProjectDetailPage() {
   const activeVote = vote && isVoteActive(vote, now) ? vote : undefined;
   const expiredVote = vote && vote.weight > 0 && !activeVote ? vote : undefined;
 
-  // Votes grouped by the month they expire in, oldest first; empty months are skipped
-  const expiryBuckets = project.votes
-    .map((raw, index) => ({ months: index + 1, amount: voteUnitsToKoin(raw) }))
+  // Votes grouped by the payout they expire after (votes[i] counts through
+  // payment_times[i]), soonest first; empty ones are skipped. A finished
+  // project's votes no longer move, so it gets no breakdown.
+  const expiryBuckets = project.status === ProjectStatus.Past ? [] : project.votes
+    .map((raw, index) => ({ index, payout: paymentTimes[index], amount: voteUnitsToKoin(raw) }))
     .filter(bucket => bucket.amount > 0);
   const maxBucket = Math.max(0, ...expiryBuckets.map(b => b.amount));
-  const paymentCount = Math.max(0, countMonthEnds(project.start_date, project.end_date));
+  const paymentCount = countPayouts(project.start_date, project.end_date);
   const paragraphs = project.description.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
 
   return (
@@ -169,15 +178,17 @@ export default function ProjectDetailPage() {
               {totalVotes === 0
                 ? 'No votes yet. The first vote puts this project on the payout list.'
                 : expiryBuckets.length === 1
-                  ? `All of it expires in ${expiryBuckets[0].months} month${expiryBuckets[0].months === 1 ? '' : 's'}.`
-                  : 'Votes expire in the months below unless renewed.'}
+                  ? expiryBuckets[0].payout
+                    ? `All of it counts through the ${formatShortDate(expiryBuckets[0].payout)} payout, then expires unless renewed.`
+                    : 'All of it expires at the same payout unless renewed.'
+                  : 'Votes expire after the payouts below unless renewed.'}
             </p>
 
             {expiryBuckets.length > 0 && (
               <div className="mt-6 grid gap-2.5" aria-label="Votes by expiry">
                 {expiryBuckets.map(bucket => (
-                  <div key={bucket.months} className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm">
-                    <span className="text-ink-2">Expires in {bucket.months} month{bucket.months === 1 ? '' : 's'}</span>
+                  <div key={bucket.index} className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm">
+                    <span className="text-ink-2">{bucket.payout ? `Counts through the ${formatShortDate(bucket.payout)} payout` : `Payout ${bucket.index + 1} from now`}</span>
                     <b className="font-semibold tabular-nums">{formatKoin(bucket.amount)}</b>
                     <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-panel-strong" aria-hidden="true">
                       <div className="h-full rounded-full bg-ink" style={{ width: `${maxBucket > 0 ? (bucket.amount / maxBucket) * 100 : 0}%` }} />
@@ -223,17 +234,6 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
       <dd className="mt-0.5 min-w-0 font-medium sm:mt-0">{children}</dd>
     </div>
   );
-}
-
-/** Month-end payouts between two dates, inclusive of an end that lands on a month end. */
-function countMonthEnds(start: Date, end: Date): number {
-  let count = 0;
-  const cursor = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
-  while (cursor <= end) {
-    count++;
-    cursor.setMonth(cursor.getMonth() + 2, 0);
-  }
-  return count;
 }
 
 /** Turns bare http(s) URLs in proposal text into links. */

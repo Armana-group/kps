@@ -105,7 +105,7 @@ export function YourVotes({ votes, titles, onChange }: YourVotesProps) {
         )}
 
         <p className="mt-2 border-t border-line pt-3 text-[13px] leading-snug text-ink-2">
-          Split up to 100% of your KOIN and VHP across projects. Votes last about six months.{' '}
+          Split up to 100% of your KOIN and VHP across projects. Each vote counts in the next six monthly payouts.{' '}
           <Link href="/docs#voting-system" className="underline underline-offset-[3px] hover:text-ink">How voting works</Link>
         </p>
       </DropdownMenuContent>

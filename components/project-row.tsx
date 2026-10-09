@@ -66,8 +66,10 @@ export function ProjectRow({ rank, project, kind, maxVotes, nextPaymentTime, vot
     third = { main: formatKoin(project.calculatedPayment ?? 0), sub: 'Full payment', dim: false };
   } else if (project.paymentStatus === 'partial') {
     third = { main: formatKoin(project.calculatedPayment ?? 0), sub: `Partial, ${formatShare(project.calculatedPayment ?? 0, monthly)}% of ask`, dim: false };
+  } else if (project.paymentStatus === 'stays') {
+    third = { main: formatKoin(project.calculatedPayment ?? 0), sub: 'Stays in the fund', dim: false };
   } else {
-    third = { main: '0', sub: totalVotes === 0 ? 'No votes yet' : 'Fund runs out first', dim: true };
+    third = { main: '0', sub: totalVotes === 0 ? 'No votes yet' : 'Budget runs out first', dim: true };
   }
 
   return (
