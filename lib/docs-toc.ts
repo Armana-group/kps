@@ -4,7 +4,6 @@
 export interface DocsSection {
   id: string;
   title: string;
-  number: number;
 }
 
 export function slugify(text: string): string {
@@ -24,7 +23,7 @@ export function getTableOfContents(markdown: string): DocsSection[] {
     const match = !inFence && /^## (.+)$/.exec(line.trim());
     if (match) {
       const title = match[1].trim();
-      sections.push({ id: slugify(title), title, number: sections.length + 1 });
+      sections.push({ id: slugify(title), title });
     }
   }
   return sections;

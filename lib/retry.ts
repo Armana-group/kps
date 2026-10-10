@@ -7,6 +7,17 @@ interface RetryOptions {
   shouldRetry?: (error: unknown) => boolean;
 }
 
+/**
+ * True for errors that a second attempt may clear: the browser's "Failed to
+ * fetch" (a TypeError) when the node turns away a burst of requests, and the
+ * node's own "context deadline exceeded" when a read times out inside it.
+ * Contract rejections and other RPC errors will fail again, so they are not.
+ */
+export function isTransientRpcError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  return error instanceof Error && error.message.includes("context deadline exceeded");
+}
+
 /** Runs `fn`, retrying after a pause if it throws a retryable error. */
 export async function withRetry<T>(
   fn: () => Promise<T>,

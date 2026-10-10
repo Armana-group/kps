@@ -65,7 +65,7 @@ Each project shows its title, description, total votes, monthly ask, and either 
 
 ### Vote weight
 
-Your voting weight is the KOIN plus the VHP in your wallet. You can give all of it to one project or split it across several, in steps of 5%.
+Your voting weight is the KOIN plus the VHP in your wallet. You can give all of it to one project or split it across several, in steps of 5%. Tokens you have deposited in a Fogata mining pool are held by the pool, not your wallet, so they do not count.
 
 ### Your votes add up to 100%
 
@@ -167,6 +167,10 @@ Connect your wallet and click "Your votes" at the top right of the main page. Ea
 ### How do I get KOIN?
 
 Buy it on an exchange or earn it through mining. See [koinos.io](https://koinos.io) for more.
+
+### Can I vote with tokens I have in Fogata?
+
+Not yet. Your vote weight is the KOIN and VHP held directly in your wallet. Tokens deposited in a Fogata mining pool are held by the pool contract, so they do not count toward your vote. To vote with them, withdraw them to your wallet first. Voting from pools is planned for Fogata v2.
 
 ### Can I change my vote?
 

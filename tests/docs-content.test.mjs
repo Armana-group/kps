@@ -16,11 +16,11 @@ test('headings become stable anchor ids', () => {
   assert.equal(slugify('  For Developers and AI Tools '), 'for-developers-and-ai-tools');
 });
 
-test('table of contents lists the numbered top-level sections', () => {
+test('table of contents lists the top-level sections', () => {
   const toc = getTableOfContents('# Title\n\n## One\n\ntext\n\n### Sub\n\n## Fees & Costs\n```\n## not a heading\n```\n');
   assert.deepEqual(toc, [
-    { id: 'one', title: 'One', number: 1 },
-    { id: 'fees-costs', title: 'Fees & Costs', number: 2 },
+    { id: 'one', title: 'One' },
+    { id: 'fees-costs', title: 'Fees & Costs' },
   ]);
 });
 
