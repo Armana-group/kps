@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = readFileSync(new URL('../lib/retry.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
-const { withRetry } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { withRetry, isTransientRpcError } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 test('returns the first successful result without retrying', async () => {
   let calls = 0;
@@ -48,4 +48,15 @@ test('does not retry errors the caller rules out', async () => {
     /contract rejected/,
   );
   assert.equal(calls, 1);
+});
+
+test('treats network failures and node timeouts as transient', () => {
+  assert.equal(isTransientRpcError(new TypeError('Failed to fetch')), true);
+  // koilib throws the node's JSON-RPC error body as a plain Error
+  assert.equal(isTransientRpcError(new Error('{"error":"An internal server error has occurred","data":"rpc failed, context deadline exceeded"}')), true);
+});
+
+test('does not treat contract rejections as transient', () => {
+  assert.equal(isTransientRpcError(new Error('{"error":"insufficient balance"}')), false);
+  assert.equal(isTransientRpcError('not an error'), false);
 });

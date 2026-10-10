@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx"
 import { Contract, Provider, ProviderInterface, SignerInterface, utils } from "koilib"
 import { twMerge } from "tailwind-merge"
 import abiKoinosFund from "./abiKoinosFund"
-import { withRetry } from "./retry"
+import { isTransientRpcError, withRetry } from "./retry"
 
 // const RPC_TESTNET = "https://rpc.koinos-testnet.com";
 // const RPC_MAINNET = "https://api.koinos.io";
@@ -61,15 +61,15 @@ const VOTE_UNITS = 20 * KOIN_UNITS;
 
 /**
  * Read-only connection to the public RPC, shared by every read. The node turns
- * away bursts of requests, which browsers report as "Failed to fetch"
- * (a TypeError), so those calls are retried after a pause.
+ * away bursts of requests ("Failed to fetch") and sometimes times out inside
+ * ("context deadline exceeded"), so those calls are retried after a pause.
  */
 class RetryingProvider extends Provider {
   async call<T = unknown>(method: string, params: unknown): Promise<T> {
     return withRetry(() => super.call<T>(method, params), {
       attempts: 3,
       delayMs: 1000,
-      shouldRetry: error => error instanceof TypeError,
+      shouldRetry: isTransientRpcError,
     });
   }
 }
